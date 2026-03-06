@@ -37,11 +37,38 @@ PROCESSED_PATH = "../processed_data/"
 SAMPLED_ORDERS = PROCESSED_PATH + "sampled_orders.csv"
 FILTERED_ORDER_PRODUCTS = PROCESSED_PATH + "filtered_order_products.csv"
 TRANSACTIONS = PROCESSED_PATH + "transactions.csv"
+
+def combine_to_set(dataframe):
+    """
+    function to group columns together for the transaction items.
     
+    for example: (product_name, order_dow)
+        input dataframe: [['Sweet Corn On The Cob' 1]
+                          ['Extra Long Grain Enriched Rice' 1]
+                          ['Beef Franks' 1]
+                          ['French Baguette Bread' 1]]
+        flatten values : ['Sweet Corn On The Cob' 1 
+                          'Extra Long Grain Enriched Rice' 1
+                          'Beef Franks' 1 
+                          'French Baguette Bread' 1]
+        finally convert to set to remove duplicates.
+    """
+    flat = dataframe.values.flatten()
+    return set(flat)    # Remove duplicates
+
+def set_elements_to_str(inputSet):
+    """
+    Turn all elements in the set into str
+    """
+    newSet = set()
+    for element in inputSet:
+        newSet.add(str(element))
+    return newSet
+
 def createTransactionsCSV(file1: str, file2: str, 
                           mergeOnColumn: str,  
                           groupByColumn: str | None = None,
-                          groupBySelection: str | None = None,
+                          groupBySelection: str | list[str] | None = None,
                           outputfile: str = "transactions.csv",
                           keepColumns1: list[str] | None = None, keepColumns2: list[str] | None = None,
                           keepColumnsMerged: list[str] | None = None,
@@ -69,18 +96,18 @@ def createTransactionsCSV(file1: str, file2: str,
     if keepColumnsMerged:
         transactions = transactions[keepColumnsMerged]
         print(f"\t - Kept only columns: {keepColumnsMerged} for merged transactions")
+            
+    if groupByColumn and groupBySelection:
+        transactions = transactions.groupby(groupByColumn)[groupBySelection].apply(combine_to_set).reset_index()
+        print(f"\t - Grouped by {groupByColumn} and selected {groupBySelection}")
     
     if newColumnNames:
         transactions.columns = newColumnNames
         print(f"\t - Renamed columns to {newColumnNames}")
-            
-    if groupByColumn and groupBySelection:
-        transactions = transactions.groupby(groupByColumn)[groupBySelection].apply(set)
-        print(f"\t - Grouped by {groupByColumn} and selected {groupBySelection}")
     
     transactions.to_csv(outputfile)
     print(f"\tSAVED TRANSACTIONS TO: {outputfile}")
-    
+
 def sampleOrders(frac):
     if os.path.exists(SAMPLED_ORDERS): 
         print("Skipped: Sample orders")
@@ -90,22 +117,25 @@ def sampleOrders(frac):
     sampledOrders.to_csv(SAMPLED_ORDERS, index=False)
     print("Sampled orders")
         
-def filterOrderProducts():
+def filterOrderProducts(keep_order_columns: list[str] = []):
+    """
+    keep_order_columns: Specify which columns from orders.csv to add to our filtered_order_products output
+    """
     if os.path.exists(FILTERED_ORDER_PRODUCTS):
         print("Skipped: Filter order_products.csv")
         return
     
-    ## Get order ids
-    sampled_orders = pd.read_csv(SAMPLED_ORDERS)
-    sampled_orders_ids = sampled_orders["order_id"]
+    if "order_id" not in keep_order_columns:
+        keep_order_columns.append("order_id")
     
-    ## Get order_products
+    sampled_orders = pd.read_csv(SAMPLED_ORDERS)
     order_products = pd.read_csv(DATA_PATH + "order_products.csv")
     
-    ## Filter orders in order_products based on ids
-    filtered_order_products = order_products[order_products["order_id"].isin(sampled_orders_ids)]
+    # Keep only selected columns (or only id's)
+    sampled_orders_columns = sampled_orders[keep_order_columns]
     
-    ## Save
+    filtered_order_products = pd.merge(order_products, sampled_orders_columns, on="order_id", how="inner")
+    
     filtered_order_products.to_csv(FILTERED_ORDER_PRODUCTS, index=False)
     print("Filtered order_products.csv")
 
@@ -122,7 +152,7 @@ if __name__ == "__main__":
     ## Sample orders
     sampleOrders(0.25)
     ## Filter order_products.csv based on sampled orders
-    filterOrderProducts()
+    filterOrderProducts(keep_order_columns=["order_dow"])
     
     # Task 1B: Construct transactions
     createTransactionsCSV(
@@ -130,11 +160,14 @@ if __name__ == "__main__":
         file2=DATA_PATH + "products.csv", 
         mergeOnColumn="product_id",     # Merge files on this column
         groupByColumn="order_id",       # Group merged datafframe on this column
-        groupBySelection="items",       # Select after grouping
+        # groupBySelection="product_name",    # Select after grouping
+        groupBySelection=["product_name", "order_dow"],      
         outputfile=TRANSACTIONS,
-        keepColumns1=["order_id", "product_id"],        # Keep only these columns from file 1
+        # keepColumns1=["order_id", "product_id"],        # Keep only these columns from file 1
+        keepColumns1=["order_id", "product_id", "order_dow"],  # This keeps the order_dow column for Task 2B purchase timing analysis
         keepColumns2=["product_id", "product_name"],    # Keep only these columns from file 2
-        keepColumnsMerged=["order_id", "product_name"], # After merge, keep only these columns
+        # keepColumnsMerged=["order_id", "product_name"], # After merge, keep only these columns
+        keepColumnsMerged=["order_id", "product_name", "order_dow"], # This keeps order_dow as well 
         newColumnNames=["order_id", "items"]    # Rename columns directly after merge (before grouping)
     )
     
@@ -142,13 +175,18 @@ if __name__ == "__main__":
     print("Loading transactions to run apriori")
     # Load transactions and turn dataframe to series by selecting items column
     transactions = pd.read_csv(TRANSACTIONS, index_col="order_id")["items"]
+    # transactions = pd.read_csv(PROCESSED_PATH + "transactions_2a_data.csv", index_col="order_id")["items"]
     
     ## Since loading the file from csv, each itemset is actually a string (see transactions.csv)
     ### Example entry: 378,"{'Whole Vitamin D Milk', 'Skim Milk'}"
     ## Turn the string back into set using ast.literal_eval (https://docs.python.org/3/library/ast.html#ast.literal_eval)
     ## python built in eval() function is also possible to use here (https://docs.python.org/3/library/functions.html#eval), but the documentation links to ast.literal_eval as a "safer" way to evaluate these strings
+    
     transactions = transactions.apply(ast.literal_eval)
     
+    # The apriori algorithm crashes if not all elements are the same type, so turn every item into a string
+    transactions = transactions.apply(set_elements_to_str)
+
     # Mine association rules with apriori
     min_supports = [0.005, 0.01, 0.05, 0.1, 0.2]
     min_confindences = [0.05, 0.1, 0.2, 0.3]
@@ -189,27 +227,3 @@ if __name__ == "__main__":
         for key in resulting_rules.keys():
             f.write(f"min. sup={key[0]}, min. conf={key[1]} || Rules={resulting_rules[key]}\n\n")
     
-    ## GENERATE FULL TRANSACTIONS (not filtered)
-    # createTransactionsCSV(
-    #     file1=DATA_PATH + "order_products.csv", 
-    #     file2=DATA_PATH + "products.csv", 
-    #     mergeOnColumn="product_id",     # Merge files on this column
-    #     groupByColumn="order_id",       # Group merged datafframe on this column
-    #     groupBySelection="items",       # Select after grouping
-    #     outputfile=PROCESSED_PATH + "transactions_FULL.csv",
-    #     keepColumns1=["order_id", "product_id"],        # Keep only these columns from file 1
-    #     keepColumns2=["product_id", "product_name"],    # Keep only these columns from file 2
-    #     keepColumnsMerged=["order_id", "product_name"], # After merge, keep only these columns
-    #     newColumnNames=["order_id", "items"]    # Rename columns directly after merge (before grouping)
-    #     )
-    
-    
-# All underneath have min_support = 0.1 and min_confidence = 0.2
-# FULL OUTPUT of apriori on the full set
-# [RelationRecord(items=frozenset({'Organic Baby Spinach', 'Bag of Organic Bananas'}), support=0.015722263912760083, ordered_statistics=[OrderedStatistic(items_base=frozenset({'Organic Baby Spinach'}), items_add=frozenset({'Bag of Organic Bananas'}), confidence=0.20900657515742635, lift=1.7708286228508512)]), RelationRecord(items=frozenset({'Bag of Organic Bananas', 'Organic Hass Avocado'}), support=0.019354271845617697, ordered_statistics=[OrderedStatistic(items_base=frozenset({'Organic Hass Avocado'}), items_add=frozenset({'Bag of Organic Bananas'}), confidence=0.2931993824617321, lift=2.4841604063142833)]), RelationRecord(items=frozenset({'Organic Raspberries', 'Bag of Organic Bananas'}), support=0.012636566397187398, ordered_statistics=[OrderedStatistic(items_base=frozenset({'Organic Raspberries'}), items_add=frozenset({'Bag of Organic Bananas'}), confidence=0.2965084886012216, lift=2.512197131299829)]), RelationRecord(items=frozenset({'Organic Strawberries', 'Bag of Organic Bananas'}), support=0.019336639288385853, ordered_statistics=[OrderedStatistic(items_base=frozenset({'Organic Strawberries'}), items_add=frozenset({'Bag of Organic Bananas'}), confidence=0.23478737340198927, lift=1.9892589541312347)]), RelationRecord(items=frozenset({'Banana', 'Large Lemon'}), support=0.012862203358374553, ordered_statistics=[OrderedStatistic(items_base=frozenset({'Large Lemon'}), items_add=frozenset({'Banana'}), confidence=0.2676625702771282, lift=1.8229952841403647)]), RelationRecord(items=frozenset({'Banana', 'Organic Avocado'}), support=0.016619731190170715, ordered_statistics=[OrderedStatistic(items_base=frozenset({'Organic Avocado'}), items_add=frozenset({'Banana'}), confidence=0.30186620635747785, lift=2.055949287422828)]), RelationRecord(items=frozenset({'Banana', 'Organic Baby Spinach'}), support=0.015957464294818747, ordered_statistics=[OrderedStatistic(items_base=frozenset({'Organic Baby Spinach'}), items_add=frozenset({'Banana'}), confidence=0.21213325122663435, lift=1.444796394935324)]), RelationRecord(items=frozenset({'Banana', 'Organic Fuji Apple'}), support=0.010505716684254396, ordered_statistics=[OrderedStatistic(items_base=frozenset({'Organic Fuji Apple'}), items_add=frozenset({'Banana'}), confidence=0.3784409348792645, lift=2.577484176798708)]), RelationRecord(items=frozenset({'Banana', 'Organic Strawberries'}), support=0.01743232310734671, ordered_statistics=[OrderedStatistic(items_base=frozenset({'Organic Strawberries'}), items_add=frozenset({'Banana'}), confidence=0.21166497929798206, lift=1.4416070901448015)]), RelationRecord(items=frozenset({'Banana', 'Strawberries'}), support=0.012904641038491873, ordered_statistics=[OrderedStatistic(items_base=frozenset({'Strawberries'}), items_add=frozenset({'Banana'}), confidence=0.28893572886346147, lift=1.967882437176007)]), RelationRecord(items=frozenset({'Organic Strawberries', 'Organic Raspberries'}), support=0.01061928230710356, ordered_statistics=[OrderedStatistic(items_base=frozenset({'Organic Raspberries'}), items_add=frozenset({'Organic Strawberries'}), confidence=0.24917428104598083, lift=3.0254985932976215)])]
-
-# Apriori output of 50% sample:
-# [RelationRecord(items=frozenset({'Bag of Organic Bananas', 'Organic Baby Spinach'}), support=0.01571006981589211, ordered_statistics=[OrderedStatistic(items_base=frozenset({'Organic Baby Spinach'}), items_add=frozenset({'Bag of Organic Bananas'}), confidence=0.20917149404799795, lift=1.7713877428727274)]), RelationRecord(items=frozenset({'Bag of Organic Bananas', 'Organic Hass Avocado'}), support=0.01930963425843474, ordered_statistics=[OrderedStatistic(items_base=frozenset({'Organic Hass Avocado'}), items_add=frozenset({'Bag of Organic Bananas'}), confidence=0.2935111417955869, lift=2.4856256888138724)]), RelationRecord(items=frozenset({'Organic Raspberries', 'Bag of Organic Bananas'}), support=0.012644194738647597, ordered_statistics=[OrderedStatistic(items_base=frozenset({'Organic Raspberries'}), items_add=frozenset({'Bag of Organic Bananas'}), confidence=0.2969903703079817, lift=2.5150898505992028)]), RelationRecord(items=frozenset({'Bag of Organic Bananas', 'Organic Strawberries'}), support=0.01930604843963095, ordered_statistics=[OrderedStatistic(items_base=frozenset({'Organic Strawberries'}), items_add=frozenset({'Bag of Organic Bananas'}), confidence=0.23451520167261958, lift=1.9860132263762456)]), RelationRecord(items=frozenset({'Banana', 'Large Lemon'}), support=0.012962137339250732, ordered_statistics=[OrderedStatistic(items_base=frozenset({'Large Lemon'}), items_add=frozenset({'Banana'}), confidence=0.2691243439093695, lift=1.8292973150088712)]), RelationRecord(items=frozenset({'Banana', 'Organic Avocado'}), support=0.01658620487695263, ordered_statistics=[OrderedStatistic(items_base=frozenset({'Organic Avocado'}), items_add=frozenset({'Banana'}), confidence=0.3010805181279698, lift=2.04651045465605)]), RelationRecord(items=frozenset({'Banana', 'Organic Baby Spinach'}), support=0.015903704031297025, ordered_statistics=[OrderedStatistic(items_base=frozenset({'Organic Baby Spinach'}), items_add=frozenset({'Banana'}), confidence=0.21174963396778915, lift=1.4393088014432214stics=[OrderedStatistic(items_base=frozenset({'Organic Fuji Apple'}), items_add=frozenset({'Banana'}), confidence=0.3762031625988312, lift=2.5571355799445707)]), RelationRecord(items=frozenset({'Banana', 'Organic Strawberries'}), support=0.017512541401266273, ordered_statistics=[OrderedStatistic(items_base=frozenset({'Organic Strawberries'}), items_add=frozenset({'Banana'}), confidence=0.2127290414379882, lift=1.4459660492771005)]), RelationRecord(items=frozenset({'Banana', 'Strawberries'}), support=0.012993214435550286, ordered_statistics=[OrderedStatistic(items_base=frozenset({'Strawberries'}), items_add=frozenset({'Banana'}), confidence=0.2908105939004816, lift=1.9767035225079295)]), RelationRecord(items=frozenset({'Organic Raspberries', 'Organic Strawberries'}), support=0.010631355116784142, ordered_statistics=[OrderedStatistic(items_base=frozenset({'Organic Raspberries'}), items_add=frozenset({'Organic Strawberries'}), confidence=0.2497122322356046, lift=3.0333143877666697)])]    
-
-# Apriori output of 25% sample:
-# [RelationRecord(items=frozenset({'Organic Baby Spinach', 'Bag of Organic Bananas'}), support=0.015599092911970144, ordered_statistics=[OrderedStatistic(items_base=frozenset({'Organic Baby Spinach'}), items_add=frozenset({'Bag of Organic Bananas'}), confidence=0.20773039145454258, lift=1.7670634260133653)]), RelationRecord(items=frozenset({'Organic Hass Avocado', 'Bag of Organic Bananas'}), support=0.019236769341667834, ordered_statistics=[OrderedStatistic(items_base=frozenset({'Organic Hass Avocado'}), items_add=frozenset({'Bag of Organic Bananas'}), confidence=0.29248609545966775, lift=2.4880398014237244)]), RelationRecord(items=frozenset({'Organic Raspberries', 'Bag of Organic Bananas'}), support=0.012578255469365456, ordered_statistics=[OrderedStatistic(items_base=frozenset({'Organic Raspberries'}), items_add=frozenset({'Bag of Organic Bananas'}), confidence=0.29412422429697543, lift=2.5019745826333275)]), RelationRecord(items=frozenset({'Bag of Organic Bananas', 'Organic Strawberries'}), support=0.019142330814574136, ordered_statistics=[OrderedStatistic(items_base=frozenset({'Organic Strawberries'}), items_add=frozenset({'Bag of Organic Bananas'}), confidence=0.23282492693778442, lift=1.980530678131527)]), RelationRecord(items=frozenset({'Banana', 'Large Lemon'}), support=0.01295361872895306, ordered_statistics=[OrderedStatistic(items_base=frozenset({'Large Lemon'}), items_add=frozenset({'Banana'}), confidence=0.2667914122513295, lift=1.8146549408121164)]), RelationRecord(items=frozenset({'Banana', 'Organic Avocado'}), support=0.016521960543822465, ordered_statistics=[OrderedStatistic(items_base=frozenset({'Organic Avocado'}), items_add=frozenset({'Banana'}), confidence=0.2991493690612757, lift=2.034746456143346)]), RelationRecord(items=frozenset({'Banana', 'Organic Baby Spinach'}), support=0.016205173079520827, ordered_statistics=[OrderedStatistic(items_base=frozenset({'Organic Baby Spinach'}), items_add=frozenset({'Banana'}), confidence=0.2158014550201379, lift=1.4678327659880868)]), RelationRecord(items=frozenset({'Banana', 'Organic Fuji Apple'}), support=0.010522125512388781, ordered_statistics=[OrderedStatistic(items_base=frozenset({'Organic Fuji Apple'}), items_add=frozenset({'Banana'}), confidence=0.37699160527668324, lift=2.5642117689888844)]), RelationRecord(items=frozenset({'Banana', 'Organic Strawberries'}), support=0.01750101312217357, ordered_statistics=[OrderedStatistic(items_base=frozenset({'Organic Strawberries'}), items_add=frozenset({'Banana'}), confidence=0.21286185788853831, lift=1.4478382901020745)]), RelationRecord(items=frozenset({'Strawberries', 'Banana'}), support=0.012869939021401683, ordered_statistics=[OrderedStatistic(items_base=frozenset({'Strawberries'}), items_add=frozenset({'Banana'}), confidence=0.2893386008761321, lift=1.968015826359949)]), RelationRecord(items=frozenset({'Organic Raspberries', 'Organic Strawberries'}), support=0.010541252302686238, ordered_statistics=[OrderedStatistic(items_base=frozenset({'Organic Raspberries'}), items_add=frozenset({'Organic Strawberries'}), confidence=0.2464918656007156, lift=2.9980388049479827)])]
