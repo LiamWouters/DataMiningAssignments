@@ -1,4 +1,6 @@
 """
+All files and their columns:
+
 orders.csv:
  - order_id
  - user_id
@@ -38,6 +40,7 @@ SAMPLED_ORDERS = PROCESSED_PATH + "sampled_orders.csv"
 FILTERED_ORDER_PRODUCTS = PROCESSED_PATH + "filtered_order_products.csv"
 TRANSACTIONS = PROCESSED_PATH + "transactions.csv"
 
+### HELPER FUNCTIONS ###
 def combine_to_set(dataframe):
     """
     function to group columns together for the transaction items.
@@ -64,7 +67,9 @@ def set_elements_to_str(inputSet):
     for element in inputSet:
         newSet.add(str(element))
     return newSet
+########################
 
+#### DATA-PROCESSING FUNCTIONS ####
 def createTransactionsCSV(file1: str, file2: str, 
                           mergeOnColumn: str,  
                           groupByColumn: str | None = None,
@@ -74,6 +79,18 @@ def createTransactionsCSV(file1: str, file2: str,
                           keepColumnsMerged: list[str] | None = None,
                           newColumnNames: list[str] | None = None
                           ):
+    """
+    This function will take 2 files and create the transaction.csv file based on given parameters.
+    
+     - file1, file2: The input files 
+     - keepColumns1, keepColumns2: The columns to keep from each of the two files
+     - mergeOnColumn: The column to merge both files on
+     - keepColumnsMerged: The columns to keep after the merge
+     - groupByColumn: To create the itemsets, specify the column to group matching values together to group items.
+     - groupBySelection: Select the column(s) that form the items after grouping
+     - newColumnNames: Specify what each of the resulting columns should be named after all the processing
+    """
+    
     if os.path.exists(outputfile):
         print("Skipped: create transactions")
         return 
@@ -109,6 +126,9 @@ def createTransactionsCSV(file1: str, file2: str,
     print(f"\tSAVED TRANSACTIONS TO: {outputfile}")
 
 def sampleOrders(frac):
+    """
+    function that samples a given fraction of the orders.csv file.
+    """
     if os.path.exists(SAMPLED_ORDERS): 
         print("Skipped: Sample orders")
         return
@@ -119,7 +139,10 @@ def sampleOrders(frac):
         
 def filterOrderProducts(keep_order_columns: list[str] = []):
     """
-    keep_order_columns: Specify which columns from orders.csv to add to our filtered_order_products output
+    function that filters the file order_products.csv based on the previously sampled orders.csv file (sampled_orders.csv)
+    
+    - keep_order_columns: Specify which columns from orders.csv to add to our filtered_order_products output
+                (This parameter exists to later on allow us to add more data such as 'order_dow' to the itemsets)
     """
     if os.path.exists(FILTERED_ORDER_PRODUCTS):
         print("Skipped: Filter order_products.csv")
@@ -138,15 +161,17 @@ def filterOrderProducts(keep_order_columns: list[str] = []):
     
     filtered_order_products.to_csv(FILTERED_ORDER_PRODUCTS, index=False)
     print("Filtered order_products.csv")
+###################################
 
 if __name__ == "__main__":
     # Remove files if they need to be reprocessed (comment out steps that dont have to be redone)
-    # if os.path.exists(SAMPLED_ORDERS):
-    #     os.remove(SAMPLED_ORDERS)
-    # if os.path.exists(FILTERED_ORDER_PRODUCTS):
-    #     os.remove(FILTERED_ORDER_PRODUCTS)
-    # if os.path.exists(TRANSACTIONS):
-    #     os.remove(TRANSACTIONS)
+    ## NOTE: COMMENT OUT THESE LINES IF YOU DO NOT WANT TO REDO CERTAIN STEPS.
+    if os.path.exists(SAMPLED_ORDERS):
+        os.remove(SAMPLED_ORDERS)
+    if os.path.exists(FILTERED_ORDER_PRODUCTS):
+        os.remove(FILTERED_ORDER_PRODUCTS)
+    if os.path.exists(TRANSACTIONS):
+        os.remove(TRANSACTIONS)
     
     # Task 1A: Preprocess/ prune data
     ## Sample orders
@@ -160,28 +185,33 @@ if __name__ == "__main__":
         file2=DATA_PATH + "products.csv", 
         mergeOnColumn="product_id",     # Merge files on this column
         groupByColumn="order_id",       # Group merged datafframe on this column
-        # groupBySelection="product_name",    # Select after grouping
-        groupBySelection=["product_name", "order_dow"],      
         outputfile=TRANSACTIONS,
-        # keepColumns1=["order_id", "product_id"],        # Keep only these columns from file 1
-        keepColumns1=["order_id", "product_id", "order_dow"],  # This keeps the order_dow column for Task 2B purchase timing analysis
         keepColumns2=["product_id", "product_name"],    # Keep only these columns from file 2
-        # keepColumnsMerged=["order_id", "product_name"], # After merge, keep only these columns
-        keepColumnsMerged=["order_id", "product_name", "order_dow"], # This keeps order_dow as well 
-        newColumnNames=["order_id", "items"]    # Rename columns directly after merge (before grouping)
+        newColumnNames=["order_id", "items"],    # Rename columns directly after merge (before grouping)
+        
+        ## NOTE: use these arguments to NOT put order_dow in the itemsets (for the first parts of the assignment)
+        groupBySelection="product_name",    # Select after grouping
+        keepColumns1=["order_id", "product_id"],        # Keep only these columns from file 1
+        keepColumnsMerged=["order_id", "product_name"], # After merge, keep only these columns
+        
+        ## NOTE: use these arguments to put order_dow in the itemsets
+        # groupBySelection=["product_name", "order_dow"],      
+        # keepColumns1=["order_id", "product_id", "order_dow"],  # This keeps the order_dow column for Task 2B purchase timing analysis
+        # keepColumnsMerged=["order_id", "product_name", "order_dow"], # This keeps order_dow as well 
     )
     
     # Task 2A: Explore dataset with apriori to mine association rules
     print("Loading transactions to run apriori")
     # Load transactions and turn dataframe to series by selecting items column
     transactions = pd.read_csv(TRANSACTIONS, index_col="order_id")["items"]
+    
+    ## Note: load the renamed/ saved transaction data that was used in the making of the report. (Might have slightly different results due to the random sampling of orders.csv)
     # transactions = pd.read_csv(PROCESSED_PATH + "transactions_2a_data.csv", index_col="order_id")["items"]
     
     ## Since loading the file from csv, each itemset is actually a string (see transactions.csv)
     ### Example entry: 378,"{'Whole Vitamin D Milk', 'Skim Milk'}"
-    ## Turn the string back into set using ast.literal_eval (https://docs.python.org/3/library/ast.html#ast.literal_eval)
+    ## Turn the string back into a Set using ast.literal_eval (https://docs.python.org/3/library/ast.html#ast.literal_eval)
     ## python built in eval() function is also possible to use here (https://docs.python.org/3/library/functions.html#eval), but the documentation links to ast.literal_eval as a "safer" way to evaluate these strings
-    
     transactions = transactions.apply(ast.literal_eval)
     
     # The apriori algorithm crashes if not all elements are the same type, so turn every item from each itemset into a string
