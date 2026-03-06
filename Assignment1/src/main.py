@@ -184,7 +184,7 @@ if __name__ == "__main__":
     
     transactions = transactions.apply(ast.literal_eval)
     
-    # The apriori algorithm crashes if not all elements are the same type, so turn every item into a string
+    # The apriori algorithm crashes if not all elements are the same type, so turn every item from each itemset into a string
     transactions = transactions.apply(set_elements_to_str)
 
     # Mine association rules with apriori
