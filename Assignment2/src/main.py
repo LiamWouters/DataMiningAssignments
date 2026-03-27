@@ -62,7 +62,7 @@ def create_model(data, type="KNN", model_args={}, rating_scale=(1,5), train_test
             - verbose: boolean, enable/disable prints
             
         return:
-            - tuple: (model (KNNWithMeans), rmse, mae)
+            - tuple: (model (KNNWithMeans), rmse, mae, precision@K, recall@K)
     """
     model = None
     if type=="KNN":
@@ -250,14 +250,14 @@ if __name__ == "__main__":
     
     if CREATE_EXAMPLE_MODELS:
         print("Creating first model... (Collaborative Filtering, user based nearest neighbour)")
-        model1, model1rmse, model1mae = create_model(
+        model1, model1rmse, model1mae, model1prec, model1rec = create_model(
             data=combined[["userId", "movieId", "rating"]],
             type="KNN"
         )
         print("Model created!")
     
         print("Creating second model... (Collaborative Filtering, item based nearest neighbour)")
-        model2, model2rmse, model2mae = create_model(
+        model2, model2rmse, model2mae, model2prec, model2rec = create_model(
             data=combined[["userId", "movieId", "rating"]],
             type="MF",
             model_args={
@@ -273,17 +273,11 @@ if __name__ == "__main__":
     
     if EVALUATE_MF: # Determine influence of parameters (and parameter combinations)
         param_grid = {
-            "n_factors": [200, 300, 400, 500, 600],
-            "n_epochs": [50, 70, 90, 110, 130],
+            "n_factors": [200, 400, 600, 800, 1000],
+            "n_epochs": [50, 100, 150],
             "lr_all": [0.01],#[0.005, 0.01, 0.015],
             "reg_all": [0.1]#[0.05, 0.1, 0.015]
         }
-        # param_grid = {
-        #     "n_factors": [150, 200, 250, 300, 350, 400],
-        #     "n_epochs": [50, 60, 70, 80, 90],
-        #     "lr_all": [0.01],#[0.005, 0.01, 0.015],
-        #     "reg_all": [0.1]#[0.05, 0.1, 0.015]
-        # }
         print("RUNNING GRIDSEARCHCV (will take a while)")
         timeBefore = time.time()
         gs = GridSearchCV(SVD, param_grid, measures=["rmse", "mae"], cv=3)
@@ -309,7 +303,7 @@ if __name__ == "__main__":
     ## (Task 2) generate top 10 for each user with the best performing model.
     # Best model: MF with parameters={'n_factors': 300, 'n_epochs': 90, 'lr_all': 0.01, 'reg_all': 0.1} 
     print("Creating Best model...")
-    best_param = {'n_factors': 300, 'n_epochs': 90, 'lr_all': 0.01, 'reg_all': 0.1} 
+    best_param = {'n_factors': 600, 'n_epochs': 100, 'lr_all': 0.01, 'reg_all': 0.1} 
     best_model = create_model(combined[["userId", "movieId", "rating"]], "MF", best_param, train_test_percent=0)[0]
     print("Done creating!")
     
@@ -320,13 +314,15 @@ if __name__ == "__main__":
         recommendations = {}
         
         ## Cold start technique: get the 10 highest rated film from different genres
-        # All movies sorted on their global average rating: (user mean centralized rating)
+        # All movies sorted on their global average rating: (user mean centering normalization rating)
         movieIdAvgRating_df = combined.groupby("movieId")["UMCNrating"].mean().reset_index()
         movieIdAvgRating_df = movieIdAvgRating_df.sort_values(by="UMCNrating", ascending=False)
         # Add the genres to the df
-        nonGenreColumns = set(["userId","rating","timestamp","title","avgUserRating"])
+        nonGenreColumns = set(["userId","rating","timestamp","title","avgUserRating","UMCNrating"])
         genreColumns = set(combined.columns) - nonGenreColumns
-        movieIdAvgRating_df = pd.merge(movieIdAvgRating_df, combined.drop(columns=nonGenreColumns))
+        
+        movieIdGenres_df = combined.drop(columns=nonGenreColumns).drop_duplicates() # All unique movies and their genres
+        movieIdAvgRating_df = pd.merge(movieIdAvgRating_df, movieIdGenres_df) # all movies with their unique genres and average (UMCN)rating
         # Pick the 10 highest rated movies (that share no genres)
         coldStartTop10 = []
         usedGenres = set()
@@ -341,16 +337,20 @@ if __name__ == "__main__":
             if len(genres) != 0:
                 coldStartTop10.append(row["movieId"])
                 usedGenres.update(genres)
+        # It is possible that we did not get a top 10 from this cold start method, for example if one highly rated movies spans (most of) our genres.
+        # In that case we could fill out the remaining spots in the top10 with just a top 10 highly rated (as long as theyre not duplicate).
+        # But, with our data set this does not happen.
         
         ## Predict top 10 for each user (or cold start if the user has not made any ratings)
+        timeBeforeRec = time.time()
         for userId in test_data["userId"]:
             if userId in combined["userId"].values: # The user has made ratings before
                 # Get all the movies that the user has rated theirselves
-                user_rated_movies = combined[combined["userId"] == userId]["movieId"].tolist()
+                user_rated_movies = set(combined[combined["userId"] == userId]["movieId"])
                 # Get all the movies the user has not rated (can be recommended)
                 movies_to_predict = []
                 for movieId in all_movieId:
-                    if movieId in user_rated_movies: 
+                    if movieId in user_rated_movies:
                         continue
                     movies_to_predict.append(movieId)
                 # Predict rating for all movies (that the user has not seen)
@@ -371,4 +371,4 @@ if __name__ == "__main__":
         rec_df.columns = test_data.columns[1:]
         rec_df.index.name = test_data.columns[0]
         rec_df.to_csv(PROCESSED_DATA_PATH + "ratings_test.csv")
-        print("Recommendations done, see "+PROCESSED_DATA_PATH+"ratings_test.csv")
+        print(f"Recommendations done ({round(time.time() - timeBeforeRec,2)} seconds), see "+PROCESSED_DATA_PATH+"ratings_test.csv")
