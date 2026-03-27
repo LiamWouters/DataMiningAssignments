@@ -23,6 +23,7 @@ from surprise.prediction_algorithms.matrix_factorization import SVD
 
 MOVIES_PATH = "../data/movies.csv"
 RATINGS_TRAIN_PATH = "../data/ratings_train.csv"
+RATINGS_TEST_PATH = "../data/ratings_test.csv"
 PROCESSED_DATA_PATH = "../processed_data/"
 
 def generateDataset(data, rating_scale=(1,5)):
@@ -74,31 +75,37 @@ def create_model(data, type="KNN", model_args={}, rating_scale=(1,5), train_test
     if verbose: print("\t-> loading data...")
     modelData = generateDataset(data, rating_scale=rating_scale)
     
-    trainSet, testSet = train_test_split(modelData, train_test_percent)
+    trainSet, testSet = (None,None)
+    if train_test_percent>0:
+        trainSet, testSet = train_test_split(modelData, train_test_percent)
+    else:
+        trainSet = modelData.build_full_trainset()
     
     if verbose: print("\t-> fitting model...")
     model.fit(trainSet)
     
     ## Evaluation
-    if verbose: print("\t-> evaluating model on test set...")
-    predictions = model.test(testSet)
-    
-    # RMSE, MAE
-    rootMeanSquaredError = rmse(predictions)
-    meanAbsoluteError = mae(predictions)
+    if testSet != None:  # Only evaluate if we have a test set
+        if verbose: print("\t-> evaluating model on test set...")
+        predictions = model.test(testSet)
+        
+        # RMSE, MAE
+        rootMeanSquaredError = rmse(predictions)
+        meanAbsoluteError = mae(predictions)
 
-    # Precision@K, Recall@K (K=10)
-    precisions, recalls = precision_recall_at_k(predictions, k=10, threshold=3.5)
-    overallPrecision = sum(precisions.values()) / len(precisions)
-    overallRecall = sum(recalls.values()) / len(recalls)
+        # Precision@K, Recall@K (K=10)
+        precisions, recalls = precision_recall_at_k(predictions, k=10, threshold=3.5)
+        overallPrecision = sum(precisions.values()) / len(precisions)
+        overallRecall = sum(recalls.values()) / len(recalls)
+        
+        if verbose:
+            print(f"\t   * Root Mean Squared Error: {rootMeanSquaredError}")
+            print(f"\t   * Mean Absolute Error: {meanAbsoluteError}")
+            print(f"\t   * Precision@K (10): {overallPrecision}")
+            print(f"\t   * Recall@K (10): {overallRecall}")
     
-    if verbose:
-        print(f"\t   * Root Mean Squared Error: {rootMeanSquaredError}")
-        print(f"\t   * Mean Absolute Error: {meanAbsoluteError}")
-        print(f"\t   * Precision@K (10): {overallPrecision}")
-        print(f"\t   * Recall@K (10): {overallRecall}")
-    
-    return (model, rootMeanSquaredError, meanAbsoluteError, overallPrecision, overallRecall)
+        return (model, rootMeanSquaredError, meanAbsoluteError, overallPrecision, overallRecall)
+    return (model, None, None, None, None)
 
 def try_different_K_for_model(k_values: list[int], count, data):
     results = {}
@@ -176,7 +183,6 @@ def precision_recall_at_k(predictions, k=10, threshold=3.5):
     precisions = dict()
     recalls = dict()
     for uid, user_ratings in user_est_true.items():
-
         # Sort user ratings by estimated value
         user_ratings.sort(key=lambda x: x[0], reverse=True)
 
@@ -207,8 +213,9 @@ if __name__ == "__main__":
     # TASK 1 FLAGS:
     CREATE_EXAMPLE_MODELS = False
     EVALUATE_KNN = False
-    EVALUATE_MF = True
+    EVALUATE_MF = False
     # TASK 2 FLAGS:
+    RECOMMEND10 = True
     
     ##########################################
     # Files holding data
@@ -219,6 +226,13 @@ if __name__ == "__main__":
     print("Pre processing data...")
     print("  -> Merging tables")
     combined = pd.merge(ratings, movies, on="movieId", how="left")
+    
+    print("  -> User mean centering normalization (of rating)")
+    ## https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.transform.html
+    ## https://medium.com/@amit25173/understanding-groupby-transform-in-pandas-b59954153907
+    combined["avgUserRating"] = combined.groupby("userId")["rating"].transform("mean")
+    combined["UMCNrating"] = combined["rating"] - combined["avgUserRating"]
+    
     print("  -> One-Hot encode categorical variables (genres)") 
     # https://www.geeksforgeeks.org/machine-learning/ml-one-hot-encoding/
     # https://www.geeksforgeeks.org/python/python-pandas-series-str-get_dummies/
@@ -288,5 +302,67 @@ if __name__ == "__main__":
         print("Best RMSE model:\n  -> Precision@K (K=10):", mf_bestRMSE_prec, "\n  -> Recall@K (K=10):", mf_bestRMSE_recall)
         print("Best MAE model:\n  -> Precision@K (K=10):", mf_bestMAE_prec, "\n  -> Recall@K (K=10):", mf_bestMAE_recall)
 
-    # TODO: (Task 2) generate top 10 for each user with the best performing model.
+    ## (Task 2) generate top 10 for each user with the best performing model.
+    # Best model: MF with parameters={'n_factors': 300, 'n_epochs': 90, 'lr_all': 0.01, 'reg_all': 0.1} 
+    best_param = {'n_factors': 300, 'n_epochs': 90, 'lr_all': 0.01, 'reg_all': 0.1} 
+    best_model = create_model(ratings[["userId", "movieId", "rating"]], "MF", best_param, train_test_percent=0)[0]
     
+    if RECOMMEND10:
+        print("Generating top 10 recommendations for all test users...")
+        test_data = pd.read_csv(RATINGS_TEST_PATH)
+        all_movieId = combined["movieId"].unique()
+        recommendations = {}
+        
+        ## Cold start technique: get the 10 highest rated film from different genres
+        # All movies sorted on their global average rating: (user mean centralized rating)
+        movieIdAvgRating_df = combined.groupby("movieId")["UMCNrating"].mean().reset_index()
+        movieIdAvgRating_df = movieIdAvgRating_df.sort_values(by="UMCNrating", ascending=False)
+        # Add the genres to the df
+        nonGenreColumns = set(["userId","rating","timestamp","title","avgUserRating"])
+        genreColumns = set(combined.columns) - nonGenreColumns
+        movieIdAvgRating_df = pd.merge(movieIdAvgRating_df, combined.drop(columns=nonGenreColumns))
+        # Pick the 10 highest rated movies (that share no genres)
+        coldStartTop10 = []
+        usedGenres = set()
+        for index,row in movieIdAvgRating_df.iterrows():    # Go over each row (highest to lowest as it was sorted earlier)
+            if len(coldStartTop10) == 10:
+                break
+            # Get the genres of the movie
+            genres = set([genre for genre in genreColumns if row[genre] == 1])
+            # Only get "new" genres
+            genres = genres - usedGenres
+            # Add if they have new genres
+            if len(genres) != 0:
+                coldStartTop10.append(row["movieId"])
+                usedGenres.update(genres)
+        
+        ## Predict top 10 for each user (or cold start if the user has not made any ratings)
+        for userId in test_data["userId"]:
+            if userId in combined["userId"].values: # The user has made ratings before
+                # Get all the movies that the user has rated theirselves
+                user_rated_movies = combined[combined["userId"] == userId]["movieId"].tolist()
+                # Get all the movies the user has not rated (can be recommended)
+                movies_to_predict = []
+                for movieId in all_movieId:
+                    if movieId in user_rated_movies: 
+                        continue
+                    movies_to_predict.append(movieId)
+                # Predict rating for all movies (that the user has not seen)
+                predictions = []
+                for movieId in movies_to_predict:
+                    p = best_model.predict(uid=userId, iid=movieId)
+                    predictions.append((movieId, p.est))
+                # Sort all predictions (high to low (descending/reverse order))
+                predictions = sorted(predictions, key=lambda x: x[1], reverse=True)
+                # Get just the top 10 predictions for the user
+                recommendations[userId] = [p[0] for p in predictions[:10]]
+                
+            else:   # The user has not made ratings (cold start)
+                recommendations[userId] = []*10 #coldStartTop10
+        
+        # Store the predictions into the test file
+        rec_df = pd.DataFrame.from_dict(recommendations,orient="index")
+        rec_df.columns = test_data.columns[1:]
+        rec_df.index.name = test_data.columns[0]
+        rec_df.to_csv(PROCESSED_DATA_PATH + "ratings_test.csv")
+        print("Recommendations done, see "+PROCESSED_DATA_PATH+"ratings_test.csv")
