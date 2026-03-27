@@ -1,6 +1,9 @@
-*.csv
+Assignment1/data
+Assignment1/processed_data/*.csv
+Assignment1/processed_data/*.png
+Assignment2/processed_data/*.csv
+Assignment2/processed_data/*.png
 *.pdf
-*.png
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
