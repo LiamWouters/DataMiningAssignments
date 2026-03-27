@@ -1,7 +1,8 @@
 Assignment1/data
 Assignment1/processed_data/*.csv
 Assignment1/processed_data/*.png
-Assignment2/processed_data/*.csv
+Assignment2/processed_data/combined.csv
+Assignment2/processed_data/k_evaluation_results_UserBasedKNN.csv
 Assignment2/processed_data/*.png
 *.pdf
 
