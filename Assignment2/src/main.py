@@ -7,10 +7,6 @@
 # ratings_test.csv: userId,recommendation1,recommendation2,recommendation3,recommendation4,recommendation5,recommendation6,recommendation7,recommendation8,recommendation9,recommendation10
 #########################
 
-# TASK 1: Create a recommendation model using a COLLABORATIVE FILTERING approach
-# - User/Item based nearest neighbour
-# - Matrix factorization
-
 import pandas as pd
 import matplotlib.pyplot as plt
 import time
@@ -21,15 +17,21 @@ from surprise.accuracy import rmse, mae
 from surprise.prediction_algorithms.knns import KNNWithMeans
 from surprise.prediction_algorithms.matrix_factorization import SVD
 
+# DATA PATH PARAMETERS
+## PLACE THE ASSIGNMENT (INPUT) DATA FILES HERE
 MOVIES_PATH = "../data/movies.csv"
 RATINGS_TRAIN_PATH = "../data/ratings_train.csv"
 RATINGS_TEST_PATH = "../data/ratings_test.csv"
+## OUTPUT FILES WILL BE GENERATED HERE
 PROCESSED_DATA_PATH = "../processed_data/"
 
+###### Helpers ######
 def generateDataset(data, rating_scale=(1,5)):
     reader = Reader(rating_scale=rating_scale)
     return Dataset.load_from_df(data, reader=reader)
+#####################
 
+### Model Creation Function ###
 def create_KNNWithMeans(k=40, min_k=1, user_based=True):
     """
         Create KNNWithMeans model
@@ -106,7 +108,9 @@ def create_model(data, type="KNN", model_args={}, rating_scale=(1,5), train_test
     
         return (model, rootMeanSquaredError, meanAbsoluteError, overallPrecision, overallRecall)
     return (model, None, None, None, None)
+###############################
 
+### Evaluation Functions ###
 def try_different_K_for_model(k_values: list[int], count, data):
     results = {}
     for k in k_values:
@@ -207,29 +211,30 @@ def precision_recall_at_k(predictions, k=10, threshold=3.5):
         recalls[uid] = n_rel_and_rec_k / n_rel if n_rel != 0 else 0
 
     return precisions, recalls
-
+############################
 
 if __name__ == "__main__":
+    ##### Enable/Disable certain parts #####
     # TASK 1 FLAGS:
     CREATE_EXAMPLE_MODELS = False
     EVALUATE_KNN = False
     EVALUATE_MF = False
     # TASK 2 FLAGS:
     RECOMMEND10 = True
+    ########################################
     
-    ##########################################
     # Files holding data
     movies = pd.read_csv(MOVIES_PATH)
     ratings = pd.read_csv(RATINGS_TRAIN_PATH)
     
-    # PRE-PROCESS (surprise only takes [userId, itemId, rating] anyways)
+    ## PRE-PROCESS ##
     print("Pre processing data...")
     print("  -> Merging tables")
     combined = pd.merge(ratings, movies, on="movieId", how="left")
     
     print("  -> User mean centering normalization (of rating)")
-    ## https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.transform.html
-    ## https://medium.com/@amit25173/understanding-groupby-transform-in-pandas-b59954153907
+    # https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.transform.html
+    # https://medium.com/@amit25173/understanding-groupby-transform-in-pandas-b59954153907
     combined["avgUserRating"] = combined.groupby("userId")["rating"].transform("mean")
     combined["UMCNrating"] = combined["rating"] - combined["avgUserRating"]
     
@@ -246,19 +251,14 @@ if __name__ == "__main__":
     if CREATE_EXAMPLE_MODELS:
         print("Creating first model... (Collaborative Filtering, user based nearest neighbour)")
         model1, model1rmse, model1mae = create_model(
-            data=ratings[["userId", "movieId", "rating"]],
+            data=combined[["userId", "movieId", "rating"]],
             type="KNN"
         )
         print("Model created!")
     
-    if EVALUATE_KNN: # What K is best? Is there a significant difference?
-        ## The following function will try a range of K_values, each 'count' amount of times and get the mean rmse and mae
-        try_different_K_for_model(k_values=[5,20,35,50,65,80,95,110,125,140], count=10, data=ratings[["userId", "movieId", "rating"]])
-    
-    if CREATE_EXAMPLE_MODELS:
         print("Creating second model... (Collaborative Filtering, item based nearest neighbour)")
         model2, model2rmse, model2mae = create_model(
-            data=ratings[["userId", "movieId", "rating"]],
+            data=combined[["userId", "movieId", "rating"]],
             type="MF",
             model_args={
                 "n_factors":100,
@@ -266,6 +266,10 @@ if __name__ == "__main__":
             }
         )
         print("Model created!")
+    
+    if EVALUATE_KNN: # What K is best? Is there a significant difference?
+        ## The following function will try a range of K_values, each 'count' amount of times and get the mean rmse and mae
+        try_different_K_for_model(k_values=[5,20,35,50,65,80,95,110,125,140], count=10, data=combined[["userId", "movieId", "rating"]])
     
     if EVALUATE_MF: # Determine influence of parameters (and parameter combinations)
         param_grid = {
@@ -283,19 +287,19 @@ if __name__ == "__main__":
         print("RUNNING GRIDSEARCHCV (will take a while)")
         timeBefore = time.time()
         gs = GridSearchCV(SVD, param_grid, measures=["rmse", "mae"], cv=3)
-        gs.fit(generateDataset(ratings[["userId", "movieId", "rating"]]))
+        gs.fit(generateDataset(combined[["userId", "movieId", "rating"]]))
         print(f"GRIDSEARCHCV took {time.time() - timeBefore} seconds")
         print(f"Best RMSE score: {gs.best_score['rmse']} (params: {gs.best_params['rmse']})")
         print(f"Best MAE score: {gs.best_score['mae']} (params: {gs.best_params['mae']})")
         
         print("Evaluating ranking metrics for best MF model...")
         best_rmse_mf_model, mf_bestRMSE_rmse, mf_bestRMSE_mae, mf_bestRMSE_prec, mf_bestRMSE_recall = create_model(
-            data=ratings[["userId", "movieId", "rating"]],
+            data=combined[["userId", "movieId", "rating"]],
             type="MF",
             model_args=gs.best_params['rmse']
         )
         best_mae_mf_model, mf_bestMAE_rmse, mf_bestMAE_mae, mf_bestMAE_prec, mf_bestMAE_recall = create_model(
-            data=ratings[["userId", "movieId", "rating"]],
+            data=combined[["userId", "movieId", "rating"]],
             type="MF",
             model_args=gs.best_params['mae']
         )
@@ -304,8 +308,10 @@ if __name__ == "__main__":
 
     ## (Task 2) generate top 10 for each user with the best performing model.
     # Best model: MF with parameters={'n_factors': 300, 'n_epochs': 90, 'lr_all': 0.01, 'reg_all': 0.1} 
+    print("Creating Best model...")
     best_param = {'n_factors': 300, 'n_epochs': 90, 'lr_all': 0.01, 'reg_all': 0.1} 
-    best_model = create_model(ratings[["userId", "movieId", "rating"]], "MF", best_param, train_test_percent=0)[0]
+    best_model = create_model(combined[["userId", "movieId", "rating"]], "MF", best_param, train_test_percent=0)[0]
+    print("Done creating!")
     
     if RECOMMEND10:
         print("Generating top 10 recommendations for all test users...")
@@ -358,7 +364,7 @@ if __name__ == "__main__":
                 recommendations[userId] = [p[0] for p in predictions[:10]]
                 
             else:   # The user has not made ratings (cold start)
-                recommendations[userId] = []*10 #coldStartTop10
+                recommendations[userId] = coldStartTop10
         
         # Store the predictions into the test file
         rec_df = pd.DataFrame.from_dict(recommendations,orient="index")
