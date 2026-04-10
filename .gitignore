@@ -5,6 +5,7 @@ Assignment2/processed_data/combined.csv
 Assignment2/processed_data/k_evaluation_results_UserBasedKNN.csv
 Assignment2/processed_data/*.png
 *.pdf
+nltk_data/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
