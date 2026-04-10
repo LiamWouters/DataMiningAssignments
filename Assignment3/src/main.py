@@ -9,6 +9,7 @@
 
 import pandas as pd
 import matplotlib.pyplot as plt
+import os
 import nltk
 from nltk.tokenize import RegexpTokenizer
 from nltk.stem import WordNetLemmatizer
@@ -94,7 +95,50 @@ def apply_bow(articles, use_tfidf, use_lemmatization, use_pos_tagging, use_stopw
     features = vectorizer.get_feature_names_out()
     
     return pd.DataFrame(data=count_array, columns=features, index=articles['doc_id'])
+
+def run_clustering(data, algorithm="KMeans", n_clusters=5, model_args={}, verbose=True):
+    """
+    Create model, fit on data, and predict cluster labels.
     
+    param:
+        - data: DataFrame holding the preprocessed BOW articles
+        - algorithm: string to choose which algorithm to use such as "KMeans"
+        - n_clusters: int, number of clusters to form
+        - model_args: dict of additional arguments for the specific model (e.g., random_state)
+        - verbose: boolean, enable/disable prints
+        
+    return:
+        - tuple: (trained_model, cluster_labels)
+    """
+    model = None
+    
+    ## Initialize the specified model
+    if algorithm == "KMeans":
+        if verbose: print(f"\t-> initializing {algorithm} with {n_clusters} clusters...")
+        # Note: setting n_init="auto" is good practice for newer sklearn versions
+        model = KMeans(n_clusters=n_clusters, **model_args)
+        
+    # elif algorithm == "Hierarchical":
+    #     # Placeholder for future implementation
+    #     pass 
+        
+    # elif algorithm == "Spectral":
+    #     # Placeholder for future implementation
+    #     pass
+        
+    else:
+        print(f"ERROR: algorithm '{algorithm}' is not supported yet.")
+        return (None, None)
+
+    ## Fit the model and get predictions
+    if verbose: print("\t-> fitting model and predicting...")
+    
+    labels = model.fit_predict(data)
+    
+    ## TODO: Evaluation
+    # if verbose: print("\t-> evaluating model (TODO)...")
+    
+    return (model, labels)
 
 ######################
 
@@ -134,6 +178,7 @@ if __name__ == "__main__":
         nltk.download(toDownload, download_dir=NLTK_DATA_PATH)
 
     ### Preprocess ###
+    print("Preprocessing articles data...")
     articles = apply_bow(
         articles,
         use_tfidf=PREPROCESS_TFIDFVECTORIZER,
@@ -143,8 +188,48 @@ if __name__ == "__main__":
         min_df=MIN_DF if PREPROCESS_MINDF else 1,
         max_df=MAX_DF if PREPROCESS_MAXDF else 1.0,
     )
+    print("Preprocessing DONE!")
         
     # Preprocessed data
     articles.to_csv(PROCESSED_DATA_PATH + "after_preprocessing.csv")
     
     ### Clustering ###
+    print("Running clustering algorithm...")
+    model, labels = run_clustering(
+        data=articles,
+        algorithm="KMeans",
+        n_clusters=5,
+        model_args={
+            
+        },
+        verbose=True
+    )
+    
+    if labels is not None:
+        print("Saving clusters...")
+        clusters = pd.read_csv(CLUSTERS_PATH)
+        clusters['label'] = labels
+        clusters.to_csv(PROCESSED_DATA_PATH+"clusters.csv", index=False)
+        print(f"Saved assigned clusters to {PROCESSED_DATA_PATH+'clusters.csv'}")
+        
+        print("Saving all clustered articles to their own files")
+        clusterFiles_dir = os.path.join(PROCESSED_DATA_PATH, "cluster_files")
+        
+        if os.path.exists(clusterFiles_dir):
+            # Iterate over all files in the directory and delete them (previous run)
+            for filename in os.listdir(clusterFiles_dir):
+                file_path = os.path.join(clusterFiles_dir, filename)
+                if os.path.isfile(file_path):
+                    os.remove(file_path)
+        else:
+            os.makedirs(clusterFiles_dir)
+        
+        articles['cluster_label'] = labels
+        unique_labels = articles['cluster_label'].unique()
+        
+        for label in unique_labels:
+            cluster_df = articles[articles['cluster_label'] == label].copy()
+            cluster_df = cluster_df.drop(columns=['cluster_label'])
+            # cluster_df = cluster_df.loc[:, (cluster_df != 0).any(axis=0)] # drop collumns where all row entries are 0 (in the bag of words)
+            clusterFile_path = os.path.join(clusterFiles_dir, f"cluster_{int(label)}.csv")
+            cluster_df.to_csv(clusterFile_path, index_label='DOC_ID')            
