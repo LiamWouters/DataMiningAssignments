@@ -9,13 +9,13 @@
 
 import pandas as pd
 import matplotlib.pyplot as plt
-import os
-import nltk
+import os, shutil, nltk
 from nltk.tokenize import RegexpTokenizer
 from nltk.stem import WordNetLemmatizer
 from nltk.corpus import wordnet, stopwords
 from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer
-from sklearn.cluster import KMeans
+from sklearn.cluster import KMeans, AgglomerativeClustering, SpectralClustering
+from sklearn.metrics import silhouette_score
 
 # DATA PATH PARAMETERS
 ## PLACE THE ASSIGNMENT (INPUT) DATA FILES HERE
@@ -108,51 +108,61 @@ def run_clustering(data, algorithm="KMeans", n_clusters=5, model_args={}, verbos
         - verbose: boolean, enable/disable prints
         
     return:
-        - tuple: (trained_model, cluster_labels)
+        - dict with keys "model, labels, silhouette(, SSE)"
     """
     model = None
     
     ## Initialize the specified model
+    if verbose: print(f"\t-> initializing {algorithm} with {n_clusters} clusters...")
     if algorithm == "KMeans":
-        if verbose: print(f"\t-> initializing {algorithm} with {n_clusters} clusters...")
-        # Note: setting n_init="auto" is good practice for newer sklearn versions
         model = KMeans(n_clusters=n_clusters, **model_args)
         
-    # elif algorithm == "Hierarchical":
-    #     # Placeholder for future implementation
-    #     pass 
+    elif algorithm == "Hierarchical":
+        model = AgglomerativeClustering(n_clusters=n_clusters)
         
-    # elif algorithm == "Spectral":
-    #     # Placeholder for future implementation
-    #     pass
+    elif algorithm == "Spectral":
+        model = SpectralClustering(n_clusters=n_clusters)
         
     else:
         print(f"ERROR: algorithm '{algorithm}' is not supported yet.")
-        return (None, None)
+        return {}
 
     ## Fit the model and get predictions
     if verbose: print("\t-> fitting model and predicting...")
     
     labels = model.fit_predict(data)
     
-    ## TODO: Evaluation
-    # if verbose: print("\t-> evaluating model (TODO)...")
+    ## Evaluation
+    if verbose: print("\t-> evaluating model (silhouette score)...")
+    silhouette = silhouette_score(data, labels, metric='euclidean')
     
-    return (model, labels)
+    ## Results
+    results = {"model": model, "labels": labels, "silhouette": silhouette}
+    if algorithm == "KMeans": 
+        results["SSE"] = model.inertia_
+    
+    return results
 
 ######################
 
 
 if __name__ == "__main__":
     ### FLAGS ###
-    PREPROCESS_TFIDFVECTORIZER = True # If this is false, a regular CountVectorizer is used
+    RANDOM_SEED = 1
+    SKIP_PREPROCESS = True # If true, should have "articles_preprocessed.csv" in processed_data
+    PREPROCESS_TFIDFVECTORIZER = False # If this is false, a regular CountVectorizer is used
     PREPROCESS_LEMMATIZATION = True # WARNING: this will download NLTK data
     PREPROCESS_LEMMATIZATION_POSTAGGING = True
     PREPROCESS_STOPWORDS = True
     PREPROCESS_MINDF = True
     PREPROCESS_MAXDF = True
     
-    
+    SSE_CURVE = True    # Plot the SSE graph for all cluster counts (KMeans only)
+    RUN_ALGORITHMS = {  # Specify which algorithms to run (with which arguments) and with which cluster count
+        "KMeans": {"modelArgs": {"n_init": 10, "random_state": RANDOM_SEED}, "clusterCounts": [i for i in range(2,11)]}, 
+        "Hierarchical": {"modelArgs": {}, "clusterCounts": [i for i in range(2,11)]}, 
+        # "Spectral": {"modelArgs": {"random_state": RANDOM_SEED}, "clusterCounts": [i for i in range(2,11)]}
+    }
     #############
     
     # CONSTANTS #
@@ -171,65 +181,109 @@ if __name__ == "__main__":
     if PREPROCESS_STOPWORDS:
         toDownload.append('stopwords')
         
-    if len(toDownload) > 0:
+    if len(toDownload) > 0 and not SKIP_PREPROCESS:
         print(f"Downloading NLTK_DATA: {toDownload}")
         if NLTK_DATA_PATH not in nltk.data.path:
             nltk.data.path.append(NLTK_DATA_PATH)
         nltk.download(toDownload, download_dir=NLTK_DATA_PATH)
 
     ### Preprocess ###
-    print("Preprocessing articles data...")
-    articles = apply_bow(
-        articles,
-        use_tfidf=PREPROCESS_TFIDFVECTORIZER,
-        use_lemmatization=PREPROCESS_LEMMATIZATION,
-        use_pos_tagging=PREPROCESS_LEMMATIZATION_POSTAGGING,
-        use_stopwords=PREPROCESS_STOPWORDS,
-        min_df=MIN_DF if PREPROCESS_MINDF else 1,
-        max_df=MAX_DF if PREPROCESS_MAXDF else 1.0,
-    )
-    print("Preprocessing DONE!")
-        
-    # Preprocessed data
-    articles.to_csv(PROCESSED_DATA_PATH + "after_preprocessing.csv")
-    
-    ### Clustering ###
-    print("Running clustering algorithm...")
-    model, labels = run_clustering(
-        data=articles,
-        algorithm="KMeans",
-        n_clusters=5,
-        model_args={
+    if not SKIP_PREPROCESS: 
+        print("Preprocessing articles data...")
+        articles = apply_bow(
+            articles,
+            use_tfidf=PREPROCESS_TFIDFVECTORIZER,
+            use_lemmatization=PREPROCESS_LEMMATIZATION,
+            use_pos_tagging=PREPROCESS_LEMMATIZATION_POSTAGGING,
+            use_stopwords=PREPROCESS_STOPWORDS,
+            min_df=MIN_DF if PREPROCESS_MINDF else 1,
+            max_df=MAX_DF if PREPROCESS_MAXDF else 1.0,
+        )
+        print("Preprocessing DONE!")
             
-        },
-        verbose=True
-    )
-    
-    if labels is not None:
-        print("Saving clusters...")
-        clusters = pd.read_csv(CLUSTERS_PATH)
-        clusters['label'] = labels
-        clusters.to_csv(PROCESSED_DATA_PATH+"clusters.csv", index=False)
-        print(f"Saved assigned clusters to {PROCESSED_DATA_PATH+'clusters.csv'}")
+        # Preprocessed data
+        articles.to_csv(PROCESSED_DATA_PATH + "articles_preprocessed.csv")
+    else:
+        # Assume preprocessing is already done and do not re-do it, just load
+        articles = pd.read_csv(PROCESSED_DATA_PATH + "articles_preprocessed.csv",index_col="doc_id")
         
-        print("Saving all clustered articles to their own files")
-        clusterFiles_dir = os.path.join(PROCESSED_DATA_PATH, "cluster_files")
+    ### Clustering ###
+    for algo in RUN_ALGORITHMS:
+        algo_args = RUN_ALGORITHMS[algo]["modelArgs"]
         
-        if os.path.exists(clusterFiles_dir):
-            # Iterate over all files in the directory and delete them (previous run)
-            for filename in os.listdir(clusterFiles_dir):
-                file_path = os.path.join(clusterFiles_dir, filename)
-                if os.path.isfile(file_path):
-                    os.remove(file_path)
+        ## Make sure directory for the algorithm exists and clear it
+        algo_path = os.path.join(PROCESSED_DATA_PATH, algo)
+        if os.path.exists(algo_path):
+            shutil.rmtree(algo_path)    # Clear all files from the previous run
         else:
-            os.makedirs(clusterFiles_dir)
+            os.makedirs(algo_path)
+            
+        sse_scores = []
         
-        articles['cluster_label'] = labels
-        unique_labels = articles['cluster_label'].unique()
+        for cluster_count in RUN_ALGORITHMS[algo]["clusterCounts"]:
+            print(f"Running clustering algorithm {algo} for {cluster_count} clusters...")
+            resultsDict = run_clustering(
+                data=articles,
+                algorithm=algo,
+                n_clusters=cluster_count,
+                model_args=algo_args,
+                verbose=True
+            )
+            labels = resultsDict["labels"]
+            
+            if algo == "KMeans":
+                sse_scores.append(resultsDict["SSE"])
+            
+            # Save output clusters
+            algo_clusterCount_path = os.path.join(algo_path, f"{cluster_count}_clusters")
+            os.makedirs(algo_clusterCount_path)
+            
+            if labels is not None:
+                full_filename = f"clusters_{cluster_count}_{algo}.csv"
+                full_filepath = os.path.join(algo_clusterCount_path, full_filename)
+                
+                print("\t=>Saving clusters...")
+                clusters = pd.read_csv(CLUSTERS_PATH)
+                clusters['label'] = labels
+                clusters.to_csv(full_filepath, index=False)
+                print(f"\t\t-> Saved assigned clusters to {full_filename}")
+                
+                print("\t\t-> Saving all clusters to their own files")
+                articles['cluster_label'] = labels
+                unique_labels = articles['cluster_label'].unique()
+                
+                for label in unique_labels:
+                    cluster_df = articles[articles['cluster_label'] == label].copy()
+                    cluster_df = cluster_df.drop(columns=['cluster_label'])
+                    
+                    ####################
+                    # Sort the top terms for the cluster
+                    specific_cluster_terms_filepath = os.path.join(algo_clusterCount_path, f"cluster_{int(label)}_terms.csv")
+                    term_frequencies: pd.DataFrame = cluster_df.sum(axis=0)
+                    sorted_term_frequencies = term_frequencies.sort_values(ascending=False).to_frame().transpose()
+                    sorted_term_frequencies.to_csv(specific_cluster_terms_filepath,index=False)
+                    ####################
+                    
+                    clusterFile_path = os.path.join(algo_clusterCount_path, f"cluster_{int(label)}.csv")
+                    cluster_df.to_csv(clusterFile_path, index_label='DOC_ID')   
+                
+                # Make sure to remove the added collumn again
+                articles = articles.drop(columns=['cluster_label'])
         
-        for label in unique_labels:
-            cluster_df = articles[articles['cluster_label'] == label].copy()
-            cluster_df = cluster_df.drop(columns=['cluster_label'])
-            # cluster_df = cluster_df.loc[:, (cluster_df != 0).any(axis=0)] # drop collumns where all row entries are 0 (in the bag of words)
-            clusterFile_path = os.path.join(clusterFiles_dir, f"cluster_{int(label)}.csv")
-            cluster_df.to_csv(clusterFile_path, index_label='DOC_ID')            
+        if algo == "KMeans" and SSE_CURVE:
+            plot_path = os.path.join(algo_path, "sse_graph.png")
+            plt.figure()
+            plt.plot(RUN_ALGORITHMS[algo]["clusterCounts"], sse_scores, marker='o', linestyle='-', color='b', label='SSE')
+            plt.title('SSE for cluster count for KMeans (lower is better)')
+            plt.xlabel('Number of clusters')
+            plt.ylabel('Error Score')
+            plt.xticks(RUN_ALGORITHMS[algo]["clusterCounts"])
+            plt.grid(True)
+            plt.savefig(plot_path)
+            
+    # TODO: 
+    # 1. what to do with silhouette score
+    # 2. compare and find the categories
+    #    -> find "best" clusterer
+    # 0. try spectral if it does not take too long
+        
