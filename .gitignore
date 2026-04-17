@@ -4,6 +4,9 @@ Assignment1/processed_data/*.png
 Assignment2/processed_data/combined.csv
 Assignment2/processed_data/k_evaluation_results_UserBasedKNN.csv
 Assignment2/processed_data/*.png
+Assignment3/processed_data/*.csv
+Assignment3/processed_data/KMeans
+Assignment3/processed_data/Hierarchical
 *.pdf
 nltk_data/
 

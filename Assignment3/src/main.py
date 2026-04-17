@@ -9,7 +9,7 @@
 
 import pandas as pd
 import matplotlib.pyplot as plt
-import os, shutil, nltk
+import os, shutil, nltk, contractions
 from nltk.tokenize import RegexpTokenizer
 from nltk.stem import WordNetLemmatizer
 from nltk.corpus import wordnet, stopwords
@@ -30,10 +30,12 @@ NLTK_DATA_PATH = "../nltk_data/"
 ####### HELPER #######
 class LemmaTokenizer:
     # From: http://scikit-learn.org/stable/modules/feature_extraction.html#customizing-the-vectorizer-classes
-    def __init__(self, pos_tagging: bool):
+    def __init__(self, pos_tagging: bool, fix_contractions: bool, verbose: bool = False):
         self.wnl = WordNetLemmatizer()
         self.token_regex = r"(?u)\b\w\w+\b" # Default from sklearns CountVectorizer token_pattern
         self.pos_tagging = pos_tagging
+        self.fix_contractions = fix_contractions
+        self.verbose = verbose
         
     def get_wordnet_pos(self,treebank_tag): 
         # source for method: https://stackoverflow.com/a/15590384
@@ -50,14 +52,34 @@ class LemmaTokenizer:
             return wordnet.NOUN
     
     def __call__(self, doc):
+        p = False
+        if len(doc) < 300 and self.verbose:
+            p = True
+            print(f"-----------------\n\t* [FULL] {doc}")
+        
+        # Expand contractions such as "we've" to "we have"
+        if self.fix_contractions:
+            doc = contractions.fix(doc)
+            if p: print(f"\t* [FIX CONTR] {doc}")
+        
         # Regular tokenization using the same regex as the default from CountVectorizer
         tokenizer = RegexpTokenizer(self.token_regex)
         tokens = tokenizer.tokenize(doc)
         
+        if p: print(f"\t* [TOKENS] {' '.join(tokens)}")
+        
         if self.pos_tagging:
             # Apply pos (part-of-speech) tagging for better lemmatization
             tokens = nltk.pos_tag(tokens)
-            return [self.wnl.lemmatize(t[0],self.get_wordnet_pos(t[1])) for t in tokens]
+            lemmatized_tokens = []
+            for t in tokens:
+                lemma = self.wnl.lemmatize(t[0], self.get_wordnet_pos(t[1]))
+                lemmatized_tokens.append(lemma)
+                # if lemma != t[0] and self.verbose:
+                #     print(f"[LEMMATIZATION] ({t[1]})\t{t[0]} -> {lemma}")
+            if p:
+                print(f"\t* [LEMMA] {' '.join(lemmatized_tokens)}")
+            return lemmatized_tokens
         else: 
             # Apply lemmatization without pos_tagging
             return [self.wnl.lemmatize(t) for t in tokens]
@@ -65,7 +87,7 @@ class LemmaTokenizer:
 ######################
 
 #### MAIN METHODS ####
-def apply_bow(articles, use_tfidf, use_lemmatization, use_pos_tagging, use_stopwords, min_df, max_df) -> pd.DataFrame:
+def apply_bow(articles, use_tfidf, use_lemmatization, use_pos_tagging, use_fix_contractions, use_stopwords, min_df, max_df) -> pd.DataFrame:
     """
     This function takes the raw articles data and returns a dataframe that contains the same data represented with the bag of words format
     
@@ -74,18 +96,20 @@ def apply_bow(articles, use_tfidf, use_lemmatization, use_pos_tagging, use_stopw
     stopwordlist = None
     if use_stopwords:
         stopwordlist = stopwords.words('english')
+        #TODO:?
+        # stopwordlist += ["would", "like", "get", "go", "know", "good", "use", "think", "one", "make", "say"] # Additional
     
     vectorizer = None
     if use_tfidf:
         vectorizer = TfidfVectorizer(
-            tokenizer = LemmaTokenizer(use_pos_tagging) if use_lemmatization else None,
+            tokenizer = LemmaTokenizer(use_pos_tagging, use_fix_contractions) if use_lemmatization else None,
             stop_words=stopwordlist,
             max_df=max_df,
             min_df=min_df,
         )
     else:
         vectorizer = CountVectorizer(
-            tokenizer = LemmaTokenizer(use_pos_tagging) if use_lemmatization else None,
+            tokenizer = LemmaTokenizer(use_pos_tagging, use_fix_contractions) if use_lemmatization else None,
             stop_words=stopwordlist,
             max_df=max_df,
             min_df=min_df,
@@ -149,9 +173,10 @@ def run_clustering(data, algorithm="KMeans", n_clusters=5, model_args={}, verbos
 if __name__ == "__main__":
     ### FLAGS ###
     RANDOM_SEED = 1
-    SKIP_PREPROCESS = True # If true, should have "articles_preprocessed.csv" in processed_data
-    PREPROCESS_TFIDFVECTORIZER = False # If this is false, a regular CountVectorizer is used
-    PREPROCESS_LEMMATIZATION = True # WARNING: this will download NLTK data
+    SKIP_PREPROCESS = False # If true, should have "articles_preprocessed.csv" in processed_data
+    PREPROCESS_TFIDF = True # If false, a regular CountVectorizer is used
+    PREPROCESS_LEMMATIZATION = True
+    PREPROCESS_LEMMATIZATION_FIXCONTRACTIONS = True
     PREPROCESS_LEMMATIZATION_POSTAGGING = True
     PREPROCESS_STOPWORDS = True
     PREPROCESS_MINDF = True
@@ -160,13 +185,12 @@ if __name__ == "__main__":
     SSE_CURVE = True    # Plot the SSE graph for all cluster counts (KMeans only)
     RUN_ALGORITHMS = {  # Specify which algorithms to run (with which arguments) and with which cluster count
         "KMeans": {"modelArgs": {"n_init": 10, "random_state": RANDOM_SEED}, "clusterCounts": [i for i in range(2,11)]}, 
-        "Hierarchical": {"modelArgs": {}, "clusterCounts": [i for i in range(2,11)]}, 
-        # "Spectral": {"modelArgs": {"random_state": RANDOM_SEED}, "clusterCounts": [i for i in range(2,11)]}
+        "Hierarchical": {"modelArgs": {}, "clusterCounts": [i for i in range(2,11)]}
     }
     #############
     
     # CONSTANTS #
-    MIN_DF = 0.05
+    MIN_DF = 0.03
     MAX_DF = 0.7
     #############
     
@@ -192,9 +216,10 @@ if __name__ == "__main__":
         print("Preprocessing articles data...")
         articles = apply_bow(
             articles,
-            use_tfidf=PREPROCESS_TFIDFVECTORIZER,
+            use_tfidf=PREPROCESS_TFIDF,
             use_lemmatization=PREPROCESS_LEMMATIZATION,
             use_pos_tagging=PREPROCESS_LEMMATIZATION_POSTAGGING,
+            use_fix_contractions=PREPROCESS_LEMMATIZATION_FIXCONTRACTIONS,
             use_stopwords=PREPROCESS_STOPWORDS,
             min_df=MIN_DF if PREPROCESS_MINDF else 1,
             max_df=MAX_DF if PREPROCESS_MAXDF else 1.0,
@@ -219,6 +244,7 @@ if __name__ == "__main__":
             os.makedirs(algo_path)
             
         sse_scores = []
+        silhouette_scores = {}
         
         for cluster_count in RUN_ALGORITHMS[algo]["clusterCounts"]:
             print(f"Running clustering algorithm {algo} for {cluster_count} clusters...")
@@ -230,6 +256,7 @@ if __name__ == "__main__":
                 verbose=True
             )
             labels = resultsDict["labels"]
+            silhouette_scores[cluster_count] = resultsDict["silhouette"]
             
             if algo == "KMeans":
                 sse_scores.append(resultsDict["SSE"])
@@ -261,6 +288,8 @@ if __name__ == "__main__":
                     specific_cluster_terms_filepath = os.path.join(algo_clusterCount_path, f"cluster_{int(label)}_terms.csv")
                     term_frequencies: pd.DataFrame = cluster_df.sum(axis=0)
                     sorted_term_frequencies = term_frequencies.sort_values(ascending=False).to_frame().transpose()
+                    cluster_file_count = len(cluster_df)
+                    sorted_term_frequencies.insert(0, 'cluster_file_count', cluster_file_count)
                     sorted_term_frequencies.to_csv(specific_cluster_terms_filepath,index=False)
                     ####################
                     
@@ -269,6 +298,10 @@ if __name__ == "__main__":
                 
                 # Make sure to remove the added collumn again
                 articles = articles.drop(columns=['cluster_label'])
+        
+        silhouette_path = os.path.join(algo_path, "silhouette_scores.csv")
+        silhouette_df = pd.Series(silhouette_scores).to_frame(name='silhouette_score')
+        silhouette_df.to_csv(silhouette_path, index_label='cluster_count')
         
         if algo == "KMeans" and SSE_CURVE:
             plot_path = os.path.join(algo_path, "sse_graph.png")
@@ -280,10 +313,28 @@ if __name__ == "__main__":
             plt.xticks(RUN_ALGORITHMS[algo]["clusterCounts"])
             plt.grid(True)
             plt.savefig(plot_path)
-            
+    
+    
+    #########################
+    
+    read_files = {
+        "algo": ["KMeans", "Hierarchical"],
+        "clusters": [2, 4, 6, 8, 10],
+        "top_terms": 5
+    }
+    
+    for alg in read_files["algo"]:
+        print(f"{alg}:")
+        for clus in read_files["clusters"]:
+            print(f"  * Run: {clus} clusters")
+            read_path = os.path.join(PROCESSED_DATA_PATH, algo, f"{clus}_clusters")
+            for f in os.listdir(read_path):
+                if f"_terms" in f:
+                    f_path = os.path.join(read_path, f)
+                    read_df = pd.read_csv(f_path)
+                    read_map = {c: round(read_df[c][0], 1) for c in list(read_df.columns)[:read_files["top_terms"]+1]}
+                    print(f"\t{f} top {read_files['top_terms']} terms: {read_map}")
+    
     # TODO: 
-    # 1. what to do with silhouette score
-    # 2. compare and find the categories
-    #    -> find "best" clusterer
-    # 0. try spectral if it does not take too long
-        
+    # 1. Ask if allowed to use TFIDF?
+    # 2. Write steps in report of task 2: 1) different preprocessing used (tfidf, count) + with and without preprocessing (or only min,maxdf), different cluster counts, top terms, countvectorizer BINARY setting (to get rid of all the super common terms overpowering)
