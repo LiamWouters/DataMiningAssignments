@@ -87,7 +87,7 @@ class LemmaTokenizer:
 ######################
 
 #### MAIN METHODS ####
-def apply_bow(articles, use_tfidf, use_lemmatization, use_pos_tagging, use_fix_contractions, use_stopwords, min_df, max_df) -> pd.DataFrame:
+def apply_bow(articles, use_vectorizer, use_lemmatization, use_pos_tagging, use_fix_contractions, use_stopwords, min_df, max_df) -> pd.DataFrame:
     """
     This function takes the raw articles data and returns a dataframe that contains the same data represented with the bag of words format
     
@@ -96,23 +96,22 @@ def apply_bow(articles, use_tfidf, use_lemmatization, use_pos_tagging, use_fix_c
     stopwordlist = None
     if use_stopwords:
         stopwordlist = stopwords.words('english')
-        #TODO:?
-        # stopwordlist += ["would", "like", "get", "go", "know", "good", "use", "think", "one", "make", "say"] # Additional
-    
+        
     vectorizer = None
-    if use_tfidf:
+    if use_vectorizer == "Tfidf":
         vectorizer = TfidfVectorizer(
             tokenizer = LemmaTokenizer(use_pos_tagging, use_fix_contractions) if use_lemmatization else None,
             stop_words=stopwordlist,
             max_df=max_df,
             min_df=min_df,
         )
-    else:
+    elif use_vectorizer == "Count" or use_vectorizer == "Count_binary":
         vectorizer = CountVectorizer(
             tokenizer = LemmaTokenizer(use_pos_tagging, use_fix_contractions) if use_lemmatization else None,
             stop_words=stopwordlist,
             max_df=max_df,
             min_df=min_df,
+            binary=use_vectorizer=="Count_binary"
         )
     bow = vectorizer.fit_transform(articles['text'])
     count_array = bow.toarray()
@@ -142,13 +141,13 @@ def run_clustering(data, algorithm="KMeans", n_clusters=5, model_args={}, verbos
         model = KMeans(n_clusters=n_clusters, **model_args)
         
     elif algorithm == "Hierarchical":
-        model = AgglomerativeClustering(n_clusters=n_clusters)
+        model = AgglomerativeClustering(n_clusters=n_clusters, **model_args)
         
     elif algorithm == "Spectral":
-        model = SpectralClustering(n_clusters=n_clusters)
+        model = SpectralClustering(n_clusters=n_clusters, **model_args)
         
     else:
-        print(f"ERROR: algorithm '{algorithm}' is not supported yet.")
+        print(f"ERROR: algorithm '{algorithm}' is not supported.")
         return {}
 
     ## Fit the model and get predictions
@@ -172,21 +171,32 @@ def run_clustering(data, algorithm="KMeans", n_clusters=5, model_args={}, verbos
 
 if __name__ == "__main__":
     ### FLAGS ###
+    # Preprocessing
     RANDOM_SEED = 1
     SKIP_PREPROCESS = False # If true, should have "articles_preprocessed.csv" in processed_data
-    PREPROCESS_TFIDF = True # If false, a regular CountVectorizer is used
+    PREPROCESS_VECTORIZER = "Tfidf" # Either: "Count", "Count_binary" or "Tfidf"
     PREPROCESS_LEMMATIZATION = True
     PREPROCESS_LEMMATIZATION_FIXCONTRACTIONS = True
     PREPROCESS_LEMMATIZATION_POSTAGGING = True
     PREPROCESS_STOPWORDS = True
     PREPROCESS_MINDF = True
     PREPROCESS_MAXDF = True
-    
+    # Clustering
     SSE_CURVE = True    # Plot the SSE graph for all cluster counts (KMeans only)
     RUN_ALGORITHMS = {  # Specify which algorithms to run (with which arguments) and with which cluster count
         "KMeans": {"modelArgs": {"n_init": 10, "random_state": RANDOM_SEED}, "clusterCounts": [i for i in range(2,11)]}, 
         "Hierarchical": {"modelArgs": {}, "clusterCounts": [i for i in range(2,11)]}
     }
+    PRINT_TERM_FILES = {
+        "algo": [
+            "KMeans", 
+            "Hierarchical",
+        ],
+        "clusters": [i for i in range(2,11)],
+        "top_terms": 5
+    }
+    # Anomaly detection
+    #TODO
     #############
     
     # CONSTANTS #
@@ -216,7 +226,7 @@ if __name__ == "__main__":
         print("Preprocessing articles data...")
         articles = apply_bow(
             articles,
-            use_tfidf=PREPROCESS_TFIDF,
+            use_vectorizer=PREPROCESS_VECTORIZER,
             use_lemmatization=PREPROCESS_LEMMATIZATION,
             use_pos_tagging=PREPROCESS_LEMMATIZATION_POSTAGGING,
             use_fix_contractions=PREPROCESS_LEMMATIZATION_FIXCONTRACTIONS,
@@ -233,6 +243,7 @@ if __name__ == "__main__":
         articles = pd.read_csv(PROCESSED_DATA_PATH + "articles_preprocessed.csv",index_col="doc_id")
         
     ### Clustering ###
+    all_silhouette_scores = {}
     for algo in RUN_ALGORITHMS:
         algo_args = RUN_ALGORITHMS[algo]["modelArgs"]
         
@@ -302,6 +313,7 @@ if __name__ == "__main__":
         silhouette_path = os.path.join(algo_path, "silhouette_scores.csv")
         silhouette_df = pd.Series(silhouette_scores).to_frame(name='silhouette_score')
         silhouette_df.to_csv(silhouette_path, index_label='cluster_count')
+        all_silhouette_scores[algo] = silhouette_scores
         
         if algo == "KMeans" and SSE_CURVE:
             plot_path = os.path.join(algo_path, "sse_graph.png")
@@ -313,28 +325,42 @@ if __name__ == "__main__":
             plt.xticks(RUN_ALGORITHMS[algo]["clusterCounts"])
             plt.grid(True)
             plt.savefig(plot_path)
+            
+            plot_path = os.path.join(algo_path, "delta_sse_graph.png")
+            plt.figure()
+            delta_sse_scores = [sse_scores[i-1] - sse_scores[i] for i in range(1, len(sse_scores))]    
+            x_labels = [f"[{i-1},{i}]" for i in RUN_ALGORITHMS[algo]["clusterCounts"][1:]]           
+            plt.bar(x_labels, delta_sse_scores, color='b', label='delta SSE')
+            plt.title('delta SSE scores for KMeans')
+            plt.xlabel('Number of clusters')
+            plt.ylabel('Delta SSE')
+            plt.grid(True)
+            plt.savefig(plot_path)
     
+    # Generate silhouette scores graph
+    silhouette_graph_path = os.path.join(PROCESSED_DATA_PATH, "silhouette_scores.png")
+    plt.figure()
+    for key in all_silhouette_scores.keys():
+        cluster_count_list = sorted(all_silhouette_scores[key].keys())
+        score_list = [all_silhouette_scores[key][c] for c in cluster_count_list]
+        plt.plot(cluster_count_list, score_list, marker='x', label=key)
+    plt.title('Silhouette scores for all cluster counts per algorithm')
+    plt.xlabel('Number of clusters')
+    plt.ylabel('Silhouette score')
+    plt.grid(True)
+    plt.legend()
+    plt.savefig(silhouette_graph_path)
     
     #########################
     
-    read_files = {
-        "algo": ["KMeans", "Hierarchical"],
-        "clusters": [2, 4, 6, 8, 10],
-        "top_terms": 5
-    }
-    
-    for alg in read_files["algo"]:
+    for alg in PRINT_TERM_FILES["algo"]:
         print(f"{alg}:")
-        for clus in read_files["clusters"]:
+        for clus in PRINT_TERM_FILES["clusters"]:
             print(f"  * Run: {clus} clusters")
-            read_path = os.path.join(PROCESSED_DATA_PATH, algo, f"{clus}_clusters")
+            read_path = os.path.join(PROCESSED_DATA_PATH, alg, f"{clus}_clusters")
             for f in os.listdir(read_path):
                 if f"_terms" in f:
                     f_path = os.path.join(read_path, f)
                     read_df = pd.read_csv(f_path)
-                    read_map = {c: round(read_df[c][0], 1) for c in list(read_df.columns)[:read_files["top_terms"]+1]}
-                    print(f"\t{f} top {read_files['top_terms']} terms: {read_map}")
-    
-    # TODO: 
-    # 1. Ask if allowed to use TFIDF?
-    # 2. Write steps in report of task 2: 1) different preprocessing used (tfidf, count) + with and without preprocessing (or only min,maxdf), different cluster counts, top terms, countvectorizer BINARY setting (to get rid of all the super common terms overpowering)
+                    read_map = {c: round(read_df[c][0], 1) for c in list(read_df.columns)[:PRINT_TERM_FILES["top_terms"]+1]}
+                    print(f"\t{f} top {PRINT_TERM_FILES['top_terms']} terms: {read_map}")
