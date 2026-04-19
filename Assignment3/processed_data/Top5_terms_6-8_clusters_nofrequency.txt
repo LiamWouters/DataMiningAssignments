@@ -1,0 +1,50 @@
+KMeans:
+  * Run: 6 clusters
+        cluster_0_terms.csv (Articles: 1009)    top 5 terms: would, one, get, like, think
+        cluster_1_terms.csv (Articles: 179)     top 5 terms: space, launch, nasa, orbit, would
+        cluster_2_terms.csv (Articles: 50)      top 5 terms: offer, deal, sale, fast, special
+        cluster_3_terms.csv (Articles: 303)     top 5 terms: game, team, play, player, hockey
+        cluster_4_terms.csv (Articles: 414)     top 5 terms: file, thanks, graphic, image, program
+        cluster_5_terms.csv (Articles: 209)     top 5 terms: car, engine, get, drive, would
+  * Run: 7 clusters
+        cluster_0_terms.csv (Articles: 1030)    top 5 terms: would, get, one, like, think
+        cluster_1_terms.csv (Articles: 209)     top 5 terms: car, engine, get, drive, would
+        cluster_2_terms.csv (Articles: 395)     top 5 terms: file, thanks, graphic, image, program
+        cluster_3_terms.csv (Articles: 179)     top 5 terms: space, launch, nasa, orbit, would
+        cluster_4_terms.csv (Articles: 50)      top 5 terms: offer, deal, sale, fast, special
+        cluster_5_terms.csv (Articles: 125)     top 5 terms: team, player, hockey, nhl, play
+        cluster_6_terms.csv (Articles: 176)     top 5 terms: game, play, win, playoff, season
+  * Run: 8 clusters
+        cluster_0_terms.csv (Articles: 49)      top 5 terms: message, food, study, one, make
+        cluster_1_terms.csv (Articles: 166)     top 5 terms: space, launch, orbit, nasa, earth
+        cluster_2_terms.csv (Articles: 205)     top 5 terms: car, engine, get, drive, would
+        cluster_3_terms.csv (Articles: 300)     top 5 terms: game, team, play, player, hockey
+        cluster_4_terms.csv (Articles: 924)     top 5 terms: would, get, one, think, like
+        cluster_5_terms.csv (Articles: 91)      top 5 terms: file, image, program, use, graphic
+        cluster_6_terms.csv (Articles: 379)     top 5 terms: thanks, graphic, anyone, would, know
+        cluster_7_terms.csv (Articles: 50)      top 5 terms: offer, deal, sale, fast, special
+Hierarchical:
+  * Run: 6 clusters
+        cluster_0_terms.csv (Articles: 1297)    top 5 terms: would, get, one, think, like
+        cluster_1_terms.csv (Articles: 460)     top 5 terms: file, use, graphic, program, would
+        cluster_2_terms.csv (Articles: 234)     top 5 terms: game, team, play, player, hockey
+        cluster_3_terms.csv (Articles: 50)      top 5 terms: offer, deal, sale, fast, special
+        cluster_4_terms.csv (Articles: 47)      top 5 terms: food, message, say, make, study
+        cluster_5_terms.csv (Articles: 76)      top 5 terms: car, get, would, like, good
+  * Run: 7 clusters
+        cluster_0_terms.csv (Articles: 460)     top 5 terms: file, use, graphic, program, would
+        cluster_1_terms.csv (Articles: 1185)    top 5 terms: would, get, one, think, like
+        cluster_2_terms.csv (Articles: 234)     top 5 terms: game, team, play, player, hockey
+        cluster_3_terms.csv (Articles: 50)      top 5 terms: offer, deal, sale, fast, special
+        cluster_4_terms.csv (Articles: 47)      top 5 terms: food, message, say, make, study
+        cluster_5_terms.csv (Articles: 76)      top 5 terms: car, get, would, like, good
+        cluster_6_terms.csv (Articles: 112)     top 5 terms: space, launch, orbit, nasa, cost
+  * Run: 8 clusters
+        cluster_0_terms.csv (Articles: 394)     top 5 terms: graphic, use, program, thanks, would
+        cluster_1_terms.csv (Articles: 66)      top 5 terms: file, image, color, use, would
+        cluster_2_terms.csv (Articles: 234)     top 5 terms: game, team, play, player, hockey
+        cluster_3_terms.csv (Articles: 1185)    top 5 terms: would, get, one, think, like
+        cluster_4_terms.csv (Articles: 47)      top 5 terms: food, message, say, make, study
+        cluster_5_terms.csv (Articles: 76)      top 5 terms: car, get, would, like, good
+        cluster_6_terms.csv (Articles: 112)     top 5 terms: space, launch, orbit, nasa, cost
+        cluster_7_terms.csv (Articles: 50)      top 5 terms: offer, deal, sale, fast, special

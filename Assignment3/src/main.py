@@ -87,7 +87,7 @@ class LemmaTokenizer:
 ######################
 
 #### MAIN METHODS ####
-def apply_bow(articles, use_vectorizer, use_lemmatization, use_pos_tagging, use_fix_contractions, use_stopwords, min_df, max_df) -> pd.DataFrame:
+def apply_bow(articles, use_vectorizer, use_lemmatization, use_pos_tagging, use_fix_contractions, use_stopwords, use_stopwords_signature, min_df, max_df) -> pd.DataFrame:
     """
     This function takes the raw articles data and returns a dataframe that contains the same data represented with the bag of words format
     
@@ -96,6 +96,8 @@ def apply_bow(articles, use_vectorizer, use_lemmatization, use_pos_tagging, use_
     stopwordlist = None
     if use_stopwords:
         stopwordlist = stopwords.words('english')
+        if use_stopwords_signature:
+            stopwordlist += ["shameful", "cadre", "dsl", "n3jxp", "chastity", "skepticism", "surrender", "intellect", "geb", "gordon", "pitt", "bank", "soon", "edu"]
         
     vectorizer = None
     if use_vectorizer == "Tfidf":
@@ -174,11 +176,13 @@ if __name__ == "__main__":
     # Preprocessing
     RANDOM_SEED = 1
     SKIP_PREPROCESS = False # If true, should have "articles_preprocessed.csv" in processed_data
+                            # NOTE: Skipping preprocessing could cause reproducability issues.
     PREPROCESS_VECTORIZER = "Tfidf" # Either: "Count", "Count_binary" or "Tfidf"
     PREPROCESS_LEMMATIZATION = True
     PREPROCESS_LEMMATIZATION_FIXCONTRACTIONS = True
     PREPROCESS_LEMMATIZATION_POSTAGGING = True
     PREPROCESS_STOPWORDS = True
+    PREPROCESS_STOPWORDS_SIGNATURE = True
     PREPROCESS_MINDF = True
     PREPROCESS_MAXDF = True
     # Clustering
@@ -193,7 +197,8 @@ if __name__ == "__main__":
             "Hierarchical",
         ],
         "clusters": [i for i in range(2,11)],
-        "top_terms": 5
+        "top_terms": 5,
+        "print_frequency": False # Print the full map (with frequency data of the top terms), or only print the top terms
     }
     # Anomaly detection
     #TODO
@@ -231,13 +236,15 @@ if __name__ == "__main__":
             use_pos_tagging=PREPROCESS_LEMMATIZATION_POSTAGGING,
             use_fix_contractions=PREPROCESS_LEMMATIZATION_FIXCONTRACTIONS,
             use_stopwords=PREPROCESS_STOPWORDS,
+            use_stopwords_signature=PREPROCESS_STOPWORDS_SIGNATURE,
             min_df=MIN_DF if PREPROCESS_MINDF else 1,
             max_df=MAX_DF if PREPROCESS_MAXDF else 1.0,
         )
         print("Preprocessing DONE!")
             
         # Preprocessed data
-        articles.to_csv(PROCESSED_DATA_PATH + "articles_preprocessed.csv")
+        articles.to_csv(PROCESSED_DATA_PATH + "articles_preprocessed.csv",
+                        float_format="%.20f") # Helps to not lose float precision for reproducability
     else:
         # Assume preprocessing is already done and do not re-do it, just load
         articles = pd.read_csv(PROCESSED_DATA_PATH + "articles_preprocessed.csv",index_col="doc_id")
@@ -363,4 +370,7 @@ if __name__ == "__main__":
                     f_path = os.path.join(read_path, f)
                     read_df = pd.read_csv(f_path)
                     read_map = {c: round(read_df[c][0], 1) for c in list(read_df.columns)[:PRINT_TERM_FILES["top_terms"]+1]}
-                    print(f"\t{f} top {PRINT_TERM_FILES['top_terms']} terms: {read_map}")
+                    if PRINT_TERM_FILES["print_frequency"]:
+                        print(f"\t{f} top {PRINT_TERM_FILES['top_terms']} terms: {read_map}")
+                    else:
+                        print(f"\t{f} (Articles: {read_map.get('cluster_file_count', 0)})\ttop {PRINT_TERM_FILES['top_terms']} terms: {', '.join(list(read_map.keys())[1:])}")

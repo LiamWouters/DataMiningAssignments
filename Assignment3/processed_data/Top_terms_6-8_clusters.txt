@@ -1,0 +1,50 @@
+KMeans:
+  * Run: 6 clusters
+        cluster_0_terms.csv top 8 terms: {'cluster_file_count': 1009, 'would': 59.2, 'one': 49.9, 'get': 49.1, 'like': 41.4, 'think': 40.8, 'know': 39.4, 'go': 37.6, 'people': 35.1}
+        cluster_1_terms.csv top 8 terms: {'cluster_file_count': 179, 'space': 44.3, 'launch': 16.7, 'nasa': 15.0, 'orbit': 14.7, 'would': 9.6, 'earth': 8.6, 'use': 7.9, 'think': 7.7}
+        cluster_2_terms.csv top 8 terms: {'cluster_file_count': 50, 'offer': 29.1, 'deal': 17.1, 'sale': 14.8, 'fast': 13.3, 'special': 6.3, 'buy': 4.9, 'list': 4.6, 'code': 3.7}
+        cluster_3_terms.csv top 8 terms: {'cluster_file_count': 303, 'game': 49.7, 'team': 42.0, 'play': 34.6, 'player': 29.9, 'hockey': 25.5, 'win': 20.6, 'season': 19.2, 'go': 17.4}
+        cluster_4_terms.csv top 8 terms: {'cluster_file_count': 414, 'file': 34.1, 'thanks': 30.8, 'graphic': 29.8, 'image': 27.9, 'program': 27.6, 'use': 26.4, 'would': 24.0, 'know': 22.0}
+        cluster_5_terms.csv top 8 terms: {'cluster_file_count': 209, 'car': 64.4, 'engine': 13.8, 'get': 13.4, 'drive': 13.0, 'would': 11.8, 'price': 9.5, 'like': 9.5, 'good': 9.2}
+  * Run: 7 clusters
+        cluster_0_terms.csv top 8 terms: {'cluster_file_count': 1030, 'would': 60.2, 'get': 50.1, 'one': 49.3, 'like': 43.3, 'think': 39.8, 'know': 39.7, 'go': 37.2, 'people': 35.3}
+        cluster_1_terms.csv top 8 terms: {'cluster_file_count': 209, 'car': 64.4, 'engine': 13.8, 'get': 13.6, 'drive': 13.0, 'would': 12.1, 'like': 9.6, 'price': 9.5, 'good': 9.3}
+        cluster_2_terms.csv top 8 terms: {'cluster_file_count': 395, 'file': 34.1, 'thanks': 30.1, 'graphic': 29.4, 'image': 27.9, 'program': 27.6, 'use': 25.4, 'would': 23.1, 'know': 21.5}
+        cluster_3_terms.csv top 8 terms: {'cluster_file_count': 179, 'space': 44.5, 'launch': 15.8, 'nasa': 15.2, 'orbit': 14.7, 'would': 9.1, 'earth': 8.6, 'think': 7.9, 'use': 7.9}
+        cluster_4_terms.csv top 8 terms: {'cluster_file_count': 50, 'offer': 29.1, 'deal': 17.1, 'sale': 14.8, 'fast': 13.3, 'special': 6.3, 'buy': 4.9, 'list': 4.6, 'code': 3.7}
+        cluster_5_terms.csv top 8 terms: {'cluster_file_count': 125, 'team': 29.8, 'player': 26.3, 'hockey': 14.0, 'nhl': 12.4, 'play': 10.4, 'would': 9.2, 'league': 7.3, 'fan': 7.1}
+        cluster_6_terms.csv top 8 terms: {'cluster_file_count': 176, 'game': 45.3, 'play': 23.8, 'win': 17.5, 'playoff': 12.8, 'season': 12.5, 'go': 11.5, 'team': 11.4, 'goal': 10.3}
+  * Run: 8 clusters
+        cluster_0_terms.csv top 8 terms: {'cluster_file_count': 49, 'message': 17.5, 'food': 17.3, 'study': 3.1, 'one': 3.0, 'make': 2.8, 'use': 2.8, 'cause': 2.8, 'say': 2.6}
+        cluster_1_terms.csv top 8 terms: {'cluster_file_count': 166, 'space': 42.9, 'launch': 15.1, 'orbit': 14.2, 'nasa': 12.8, 'earth': 8.6, 'would': 8.1, 'use': 7.6, 'cost': 6.8}
+        cluster_2_terms.csv top 8 terms: {'cluster_file_count': 205, 'car': 63.6, 'engine': 13.8, 'get': 13.4, 'drive': 12.8, 'would': 11.6, 'price': 9.5, 'like': 9.3, 'good': 9.2}
+        cluster_3_terms.csv top 8 terms: {'cluster_file_count': 300, 'game': 49.4, 'team': 41.8, 'play': 34.6, 'player': 29.9, 'hockey': 24.4, 'win': 20.6, 'season': 19.2, 'go': 17.4}
+        cluster_4_terms.csv top 8 terms: {'cluster_file_count': 924, 'would': 56.5, 'get': 48.3, 'one': 44.9, 'think': 39.3, 'like': 39.2, 'go': 35.1, 'know': 34.8, 'people': 32.5}
+        cluster_5_terms.csv top 8 terms: {'cluster_file_count': 91, 'file': 33.9, 'image': 9.5, 'program': 8.3, 'use': 7.0, 'graphic': 5.3, 'color': 5.3, 'window': 4.8, 'know': 4.6}
+        cluster_6_terms.csv top 8 terms: {'cluster_file_count': 379, 'thanks': 27.8, 'graphic': 24.9, 'anyone': 22.4, 'would': 21.9, 'know': 20.0, 'look': 19.1, 'program': 18.8, 'please': 18.7}
+        cluster_7_terms.csv top 8 terms: {'cluster_file_count': 50, 'offer': 29.1, 'deal': 17.1, 'sale': 14.8, 'fast': 13.3, 'special': 6.3, 'buy': 4.9, 'list': 4.6, 'code': 3.7}
+Hierarchical:
+  * Run: 6 clusters
+        cluster_0_terms.csv top 8 terms: {'cluster_file_count': 1297, 'would': 77.4, 'get': 63.8, 'one': 54.3, 'think': 52.6, 'like': 51.7, 'know': 49.5, 'go': 48.9, 'space': 44.5}
+        cluster_1_terms.csv top 8 terms: {'cluster_file_count': 460, 'file': 32.4, 'use': 27.7, 'graphic': 25.7, 'program': 24.8, 'would': 24.4, 'image': 24.3, 'thanks': 24.1, 'know': 20.1}
+        cluster_2_terms.csv top 8 terms: {'cluster_file_count': 234, 'game': 41.6, 'team': 31.8, 'play': 29.9, 'player': 25.6, 'hockey': 21.0, 'season': 16.1, 'win': 15.9, 'playoff': 15.4}
+        cluster_3_terms.csv top 8 terms: {'cluster_file_count': 50, 'offer': 29.1, 'deal': 17.1, 'sale': 14.8, 'fast': 13.3, 'special': 6.3, 'buy': 4.9, 'list': 4.6, 'code': 3.7}
+        cluster_4_terms.csv top 8 terms: {'cluster_file_count': 47, 'food': 17.0, 'message': 16.2, 'say': 3.1, 'make': 2.8, 'study': 2.6, 'effect': 2.6, 'one': 2.6, 'cause': 2.5}
+        cluster_5_terms.csv top 8 terms: {'cluster_file_count': 76, 'car': 31.1, 'get': 5.3, 'would': 4.9, 'like': 4.5, 'good': 4.2, 'buy': 4.0, 'look': 3.9, 'engine': 3.4}
+  * Run: 7 clusters
+        cluster_0_terms.csv top 8 terms: {'cluster_file_count': 460, 'file': 32.4, 'use': 27.7, 'graphic': 25.7, 'program': 24.8, 'would': 24.4, 'image': 24.3, 'thanks': 24.1, 'know': 20.1}
+        cluster_1_terms.csv top 8 terms: {'cluster_file_count': 1185, 'would': 70.2, 'get': 60.1, 'one': 51.2, 'think': 48.4, 'like': 48.3, 'know': 46.4, 'go': 46.1, 'good': 39.4}
+        cluster_2_terms.csv top 8 terms: {'cluster_file_count': 234, 'game': 41.6, 'team': 31.8, 'play': 29.9, 'player': 25.6, 'hockey': 21.0, 'season': 16.1, 'win': 15.9, 'playoff': 15.4}
+        cluster_3_terms.csv top 8 terms: {'cluster_file_count': 50, 'offer': 29.1, 'deal': 17.1, 'sale': 14.8, 'fast': 13.3, 'special': 6.3, 'buy': 4.9, 'list': 4.6, 'code': 3.7}
+        cluster_4_terms.csv top 8 terms: {'cluster_file_count': 47, 'food': 17.0, 'message': 16.2, 'say': 3.1, 'make': 2.8, 'study': 2.6, 'effect': 2.6, 'one': 2.6, 'cause': 2.5}
+        cluster_5_terms.csv top 8 terms: {'cluster_file_count': 76, 'car': 31.1, 'get': 5.3, 'would': 4.9, 'like': 4.5, 'good': 4.2, 'buy': 4.0, 'look': 3.9, 'engine': 3.4}
+        cluster_6_terms.csv top 8 terms: {'cluster_file_count': 112, 'space': 25.6, 'launch': 16.0, 'orbit': 11.6, 'nasa': 11.4, 'cost': 9.2, 'would': 7.2, 'project': 5.1, 'use': 4.7}
+  * Run: 8 clusters
+        cluster_0_terms.csv top 8 terms: {'cluster_file_count': 394, 'graphic': 23.1, 'use': 23.1, 'program': 21.7, 'thanks': 21.0, 'would': 20.8, 'anyone': 18.4, 'know': 16.9, 'help': 16.3}
+        cluster_1_terms.csv top 8 terms: {'cluster_file_count': 66, 'file': 19.7, 'image': 14.8, 'color': 10.2, 'use': 4.7, 'would': 3.6, 'know': 3.1, 'program': 3.1, 'thanks': 3.1}
+        cluster_2_terms.csv top 8 terms: {'cluster_file_count': 234, 'game': 41.6, 'team': 31.8, 'play': 29.9, 'player': 25.6, 'hockey': 21.0, 'season': 16.1, 'win': 15.9, 'playoff': 15.4}
+        cluster_3_terms.csv top 8 terms: {'cluster_file_count': 1185, 'would': 70.2, 'get': 60.1, 'one': 51.2, 'think': 48.4, 'like': 48.3, 'know': 46.4, 'go': 46.1, 'good': 39.4}
+        cluster_4_terms.csv top 8 terms: {'cluster_file_count': 47, 'food': 17.0, 'message': 16.2, 'say': 3.1, 'make': 2.8, 'study': 2.6, 'effect': 2.6, 'one': 2.6, 'cause': 2.5}
+        cluster_5_terms.csv top 8 terms: {'cluster_file_count': 76, 'car': 31.1, 'get': 5.3, 'would': 4.9, 'like': 4.5, 'good': 4.2, 'buy': 4.0, 'look': 3.9, 'engine': 3.4}
+        cluster_6_terms.csv top 8 terms: {'cluster_file_count': 112, 'space': 25.6, 'launch': 16.0, 'orbit': 11.6, 'nasa': 11.4, 'cost': 9.2, 'would': 7.2, 'project': 5.1, 'use': 4.7}
+        cluster_7_terms.csv top 8 terms: {'cluster_file_count': 50, 'offer': 29.1, 'deal': 17.1, 'sale': 14.8, 'fast': 13.3, 'special': 6.3, 'buy': 4.9, 'list': 4.6, 'code': 3.7}
