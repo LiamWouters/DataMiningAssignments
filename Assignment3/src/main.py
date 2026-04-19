@@ -13,6 +13,8 @@ import os, shutil, nltk, contractions
 from nltk.tokenize import RegexpTokenizer
 from nltk.stem import WordNetLemmatizer
 from nltk.corpus import wordnet, stopwords
+from sklearn.neighbors import LocalOutlierFactor
+from sklearn.ensemble import IsolationForest
 from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer
 from sklearn.cluster import KMeans, AgglomerativeClustering, SpectralClustering
 from sklearn.metrics import silhouette_score
@@ -168,6 +170,22 @@ def run_clustering(data, algorithm="KMeans", n_clusters=5, model_args={}, verbos
     
     return results
 
+def find_anomalies(data, use_lof=False, use_if=False, random_seed=1):
+    anomalies_predictions = {}
+    if use_lof: # https://scikit-learn.org/stable/modules/generated/sklearn.neighbors.LocalOutlierFactor.html
+        lof = LocalOutlierFactor(contamination=50/2164)
+        anomalies_predictions["lof"] = lof.fit_predict(data)
+    if use_if: # https://scikit-learn.org/stable/modules/generated/sklearn.ensemble.IsolationForest.html
+        isof = IsolationForest(contamination=50/2164, random_state=random_seed)
+        anomalies_predictions["if"] = isof.fit_predict(data)
+    
+    for alg in anomalies_predictions:
+        print(f"anomalies of {alg}: ", anomalies_predictions[alg])
+        anomalies_alg_path = os.path.join(PROCESSED_DATA_PATH, f"anomalies_{alg}.csv")
+        anomalies_df = data[anomalies_predictions[alg] == -1]
+        anomalies_df = anomalies_df.reset_index()[['doc_id']]
+        anomalies_df.to_csv(anomalies_alg_path, index=False)
+
 ######################
 
 
@@ -177,31 +195,33 @@ if __name__ == "__main__":
     RANDOM_SEED = 1
     SKIP_PREPROCESS = False # If true, should have "articles_preprocessed.csv" in processed_data
                             # NOTE: Skipping preprocessing could cause reproducability issues.
-    PREPROCESS_VECTORIZER = "Tfidf" # Either: "Count", "Count_binary" or "Tfidf"
+    PREPROCESS_VECTORIZER = "Count_binary" # Either: "Count", "Count_binary" or "Tfidf"
     PREPROCESS_LEMMATIZATION = True
     PREPROCESS_LEMMATIZATION_FIXCONTRACTIONS = True
     PREPROCESS_LEMMATIZATION_POSTAGGING = True
     PREPROCESS_STOPWORDS = True
     PREPROCESS_STOPWORDS_SIGNATURE = True
-    PREPROCESS_MINDF = True
+    PREPROCESS_MINDF = False
     PREPROCESS_MAXDF = True
     # Clustering
     SSE_CURVE = True    # Plot the SSE graph for all cluster counts (KMeans only)
     RUN_ALGORITHMS = {  # Specify which algorithms to run (with which arguments) and with which cluster count
-        "KMeans": {"modelArgs": {"n_init": 10, "random_state": RANDOM_SEED}, "clusterCounts": [i for i in range(2,11)]}, 
-        "Hierarchical": {"modelArgs": {}, "clusterCounts": [i for i in range(2,11)]}
+        # "KMeans": {"modelArgs": {"n_init": 10, "random_state": RANDOM_SEED}, "clusterCounts": [i for i in range(2,11)]}, 
+        # "Hierarchical": {"modelArgs": {}, "clusterCounts": [i for i in range(2,11)]}
     }
     PRINT_TERM_FILES = {
         "algo": [
-            "KMeans", 
-            "Hierarchical",
+            # "KMeans",       # Comment these out to stop printing
+            # "Hierarchical",
         ],
         "clusters": [i for i in range(2,11)],
         "top_terms": 5,
         "print_frequency": False # Print the full map (with frequency data of the top terms), or only print the top terms
     }
     # Anomaly detection
-    #TODO
+    # ANOMALY_KNN = True  # K nearest neighbours approach
+    ANOMALY_LOF = True  # Local outlier factor approach
+    ANOMALY_IF = True   # Isolation Forest approach
     #############
     
     # CONSTANTS #
@@ -374,3 +394,12 @@ if __name__ == "__main__":
                         print(f"\t{f} top {PRINT_TERM_FILES['top_terms']} terms: {read_map}")
                     else:
                         print(f"\t{f} (Articles: {read_map.get('cluster_file_count', 0)})\ttop {PRINT_TERM_FILES['top_terms']} terms: {', '.join(list(read_map.keys())[1:])}")
+
+    # ANOMALY DETECTION
+    print("Starting anomaly detection...")
+    find_anomalies(data=articles, use_lof=ANOMALY_LOF, use_if=ANOMALY_IF, random_seed=RANDOM_SEED)
+    print("Anomaly detection DONE!")
+
+# TODO: finish anomaly detection
+# 1) find best preprocessing combination for anomaly detection
+# 2) find best parameter settings (maybe focus on only 1 anomaly detection alg)
