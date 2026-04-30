@@ -79,8 +79,6 @@ class LemmaTokenizer:
             for t in tokens:
                 lemma = self.wnl.lemmatize(t[0], self.get_wordnet_pos(t[1]))
                 lemmatized_tokens.append(lemma)
-                # if lemma != t[0] and self.verbose:
-                #     print(f"[LEMMATIZATION] ({t[1]})\t{t[0]} -> {lemma}")
             if p:
                 print(f"\t* [LEMMA] {' '.join(lemmatized_tokens)}")
             return lemmatized_tokens
@@ -210,12 +208,12 @@ if __name__ == "__main__":
                             # NOTE: Skipping preprocessing could cause reproducability issues.
     PREPROCESS_FLAGS = {
         "clustering": {
-            "use_vectorizer": "Tfidf",      # Either 'Count', 'Count_binary' or 'Tfidf'
-            "use_token_pattern": r"(?u)\b\w\w+\b", # Default from sklearns CountVectorizer token_pattern,
-            "use_analyzer": "word",         # Default for clustering words
+            "use_vectorizer": "Tfidf",              # Either 'Count', 'Count_binary' or 'Tfidf'
+            "use_token_pattern": r"(?u)\b\w\w+\b",  # Default from sklearns CountVectorizer token_pattern,
+            "use_analyzer": "word",                 # Default for clustering words
             "use_lemmatization": True,
-            "use_fix_contractions": True,   # Extends lemmatization
-            "use_pos_tagging": True,        # Extends lemmatization
+            "use_fix_contractions": True,           # Extends lemmatization
+            "use_pos_tagging": True,                # Extends lemmatization
             "use_stopwords": True,
             "use_stopwords_signature": True,
             "min_df": 0.03,
@@ -224,12 +222,12 @@ if __name__ == "__main__":
         "anomaly": {
             "use_vectorizer": "Count",
             "use_token_pattern": r"(?u)\b\w\w+\b",  # N/A when using character analyzer
-            "use_analyzer": "char_wb",      # look at individual characters instead of words
-            "use_lemmatization": False,      # N/A when using character analyzer
-            "use_fix_contractions": False,  # "
-            "use_pos_tagging": False,       # "
-            "use_stopwords": False,         # "
-            "use_stopwords_signature": False,   # "
+            "use_analyzer": "char_wb",              # look at individual characters instead of words
+            "use_lemmatization": False,             # N/A when using character analyzer
+            "use_fix_contractions": False,          # "
+            "use_pos_tagging": False,               # "
+            "use_stopwords": False,                 # "
+            "use_stopwords_signature": False,       # "
             "min_df": 1,
             "max_df": 0.4
         }
@@ -237,13 +235,13 @@ if __name__ == "__main__":
     # Clustering
     SSE_CURVE = True    # Plot the SSE graph for all cluster counts (KMeans only)
     RUN_ALGORITHMS = {  # Specify which algorithms to run (with which arguments) and with which cluster count
-        # "KMeans": {"modelArgs": {"n_init": 10, "random_state": RANDOM_SEED}, "clusterCounts": [i for i in range(2,11)]}, 
-        # "Hierarchical": {"modelArgs": {}, "clusterCounts": [i for i in range(2,11)]}
+        "KMeans": {"modelArgs": {"n_init": 10, "random_state": RANDOM_SEED}, "clusterCounts": [i for i in range(2,11)]}, 
+        "Hierarchical": {"modelArgs": {}, "clusterCounts": [i for i in range(2,11)]}
     }
     PRINT_TERM_FILES = {
         "algo": [
-            # "KMeans",       # Comment these out to stop printing
-            # "Hierarchical",
+            "KMeans",       # Comment these out to stop printing
+            "Hierarchical",
         ],
         "clusters": [i for i in range(2,11)],
         "top_terms": 5,
