@@ -18,3 +18,9 @@
 - The data is already present inside `Assignment3/data`
 - Run `Assignment3/src/main.py`
     - There are different 'flags' inside the file for all tasks to quickly enable/disable certain functionalities.
+ 
+## Assignment 4
+
+- The data is already present inside `Assignment4/data`
+- Run `python -m src.main` inside the `Assignment4` directory
+    - There are different 'flags' inside the file for all tasks to quickly enable/disable certain functionalities.
