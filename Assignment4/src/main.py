@@ -1,14 +1,17 @@
 ## PROVIDED DATA ##
-# articles.csv: doc_id,text
+# income.csv:       age,workclass,education,marital status,occupation,workinghours,sex,ability to speak english,gave birth this year,income
+# income_test.csv:  age,workclass,education,marital status,occupation,workinghours,sex,ability to speak english,gave birth this year
 ###################
 
 ## EVENTUAL PREDICTION ##
-# anomalies.csv: anomaly,doc_id
-# clusters.csv: doc_id,label
+# predictions_template.csv: id,income
 #########################
 
+import time, shap
+import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
-from . import Preprocessor, Classifier
+from src import Preprocessor, DecisionTree, RandomForest, KNearestNeighbors, GaussianNaiveBayes
 
 # DATA PATH PARAMETERS
 ## PLACE THE ASSIGNMENT (INPUT) DATA FILES HERE
@@ -18,15 +21,26 @@ PREDICTIONS_TEMPLATE_PATH = "./data/predictions_templace.csv"
 ## OUTPUT FILES WILL BE GENERATED HERE
 PROCESSED_DATA_PATH = "./processed_data/"
 
-if __name__ == "__main__":    
+if __name__ == "__main__": 
+    # PREPROCESSING FLAGS   
     DROP_ABILITY_TO_SPEAK_ENGLISH = False    # if not dropped its empty rows will be filled and the column will be normalized
     DROP_GAVE_BIRTH_THIS_YEAR = False        # ^^ and the column will be one hot encoded instead of normalized
     FILL_CONDITION_GAVE_BIRTH_THIS_YEAR = True # Ignored if the column is dropped with DROP_GAVE_BIRTH_THIS_YEAR
 
     NORMALIZE_COLUMNS = ["age", "education", "workinghours"]  # Columns of which the values must be normalized from: [min_value, max_value] -> [0, 1]
-    
     OHE_COLUMNS = ["workclass", "marital status", "occupation", "sex"] # Define columns to one hot encode
+    LABEL_COLUMN = "income"
+    CHOSEN_MODEL_PARAMETERS = { # Parameters for the model chosen for Task 2 & 3 (Random Forest)
+        "max_depth": 20, "min_samples_leaf": 5, "min_samples_split": 20, "n_estimators": 250
+    }
     
+    # GENERAL EXECUTION FLAGS
+    PERFORM_INITIAL_MODEL_CREATION = False
+    PERFORM_GRIDSEARCHCV = False
+    PERFORM_BEST_GRIDSEARCH_MODEL_CREATION = True
+    PERFORM_SHAP_COMPUTE = True
+    
+    RANDOM_SEED = 1 #int(time.time())
     #################
     
     pp = Preprocessor()
@@ -74,6 +88,93 @@ if __name__ == "__main__":
     # Encode categorical values
     pp.OneHotEncode(columns=OHE_COLUMNS)
     
-    # Perform all the set preprocessings
-    pp.process(INCOME_PATH, INCOME_TEST_PATH, ignore_from_train_data="income", save_to_file=True)
+    # Encode labels
+    pp.LabelEncode(column=LABEL_COLUMN)
     
+    # Perform all the set preprocessings
+    pp.process(INCOME_PATH, INCOME_TEST_PATH, save_to_file=True)
+    
+    if PERFORM_INITIAL_MODEL_CREATION:
+        dt = DecisionTree(pp, "income", random_seed=RANDOM_SEED)
+        print(f"[DecisionTree] Train Accuracy: {dt.train_accuracy}")
+        print(f"[DecisionTree] Test Accuracy: {dt.test_accuracy}")
+        print(f"[DecisionTree] (roc) AUC: {dt.roc_auc}")
+        print(f"[DecisionTree] Precision: {dt.precision}")
+        print(f"[DecisionTree] Recall: {dt.recall}")
+        rf = RandomForest(pp, "income", random_seed=RANDOM_SEED)
+        print(f"[RandomForest] Train Accuracy: {rf.train_accuracy}")
+        print(f"[RandomForest] Test Accuracy: {rf.test_accuracy}")
+        print(f"[RandomForest] (roc) AUC: {rf.roc_auc}")
+        print(f"[RandomForest] Precision: {rf.precision}")
+        print(f"[RandomForest] Recall: {rf.recall}")
+        knn = KNearestNeighbors(pp, "income", random_seed=RANDOM_SEED)
+        print(f"[KNearestNeighbors] Train Accuracy: {knn.train_accuracy}")
+        print(f"[KNearestNeighbors] Test Accuracy: {knn.test_accuracy}")
+        print(f"[KNearestNeighbors] (roc) AUC: {knn.roc_auc}")
+        print(f"[KNearestNeighbors] Precision: {knn.precision}")
+        print(f"[KNearestNeighbors] Recall: {knn.recall}")
+        gnb = GaussianNaiveBayes(pp, "income", random_seed=RANDOM_SEED)
+        print(f"[GaussianNaiveBayes] Train Accuracy: {gnb.train_accuracy}")
+        print(f"[GaussianNaiveBayes] Test Accuracy: {gnb.test_accuracy}")
+        print(f"[GaussianNaiveBayes] (roc) AUC: {gnb.roc_auc}")
+        print(f"[GaussianNaiveBayes] Precision: {gnb.precision}")
+        print(f"[GaussianNaiveBayes] Recall: {gnb.recall}")
+    
+    if PERFORM_GRIDSEARCHCV:
+        print("\nPerform Grid Searches:")
+        # Grid search for Decision Tree
+        dt_param_grid = {
+            "max_depth": [None, 4, 6, 8, 10, 15, 20],
+            "max_features": [None, "sqrt", "log2"],
+            "min_samples_split": [5, 10, 15, 20],  
+            "min_samples_leaf": [5, 10, 15, 20],
+        }
+        dt_gscv = DecisionTree(pp, "income", random_seed=RANDOM_SEED)
+        
+        timeBefore = time.time()
+        best_dt_params = dt_gscv.cross_validate(dt_param_grid, score_metric="accuracy")
+        timeAfter = time.time()
+        print(f"[[Decision Tree Gridsearch took: {timeAfter-timeBefore} seconds]]")
+            
+        # Grid search for Random Forest
+        rf_param_grid = {
+            "n_estimators": [100, 150, 200, 250],
+            "max_depth": [5, 10, 25, 20],
+            "min_samples_split": [10, 20],  
+            "min_samples_leaf": [5, 10],
+        }
+        rf_gscv = RandomForest(pp, "income", random_seed=RANDOM_SEED)
+        
+        timeBefore = time.time()
+        best_rf_params = rf_gscv.cross_validate(rf_param_grid, score_metric="accuracy")
+        timeAfter = time.time()
+        print(f"[[Random Forest Gridsearch took: {timeAfter-timeBefore} seconds]]")
+        
+        if PERFORM_BEST_GRIDSEARCH_MODEL_CREATION:
+            best_dt = DecisionTree(pp, "income", model_params=best_dt_params, random_seed=RANDOM_SEED)
+            print(f"Best params: [DecisionTree] Train Accuracy: {best_dt.train_accuracy}")
+            print(f"Best params: [DecisionTree] Test Accuracy: {best_dt.test_accuracy}")
+            print(f"Best params: [DecisionTree] (roc) AUC: {best_dt.roc_auc}")
+            print(f"Best params: [DecisionTree] Precision: {best_dt.precision}")
+            print(f"Best params: [DecisionTree] Recall: {best_dt.recall}")
+            
+            best_rf = RandomForest(pp, "income", model_params=best_rf_params, random_seed=RANDOM_SEED)
+            print(f"Best params: [RandomForest] Train Accuracy: {best_rf.train_accuracy}")
+            print(f"Best params: [RandomForest] Test Accuracy: {best_rf.test_accuracy}")
+            print(f"Best params: [RandomForest] (roc) AUC: {best_rf.roc_auc}")
+            print(f"Best params: [RandomForest] Precision: {best_rf.precision}")
+            print(f"Best params: [RandomForest] Recall: {best_rf.recall}")
+
+    chosen_model = RandomForest(pp, "income", model_params=CHOSEN_MODEL_PARAMETERS, random_seed=RANDOM_SEED)
+    chosen_model._train_model()
+    # print(f"Feature Importances: {chosen_model.importances}")
+    
+    # SHAP
+    if PERFORM_SHAP_COMPUTE:
+        print("Calculating SHAP values")
+        timeBefore = time.time()
+        explainer = shap.TreeExplainer(chosen_model.model)
+        shap_values = explainer.shap_values(chosen_model._X_test)
+        timeAfter = time.time()
+        print(f"[[SHAP COMPUTE TIME: {timeAfter-timeBefore} seconds]")
+        
