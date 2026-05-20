@@ -7,11 +7,13 @@
 # predictions_template.csv: id,income
 #########################
 
-import time, shap
+import time, shap, pathlib
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from src import Preprocessor, DecisionTree, RandomForest, KNearestNeighbors, GaussianNaiveBayes
+
+filePath = pathlib.Path(__file__).parent.resolve()
 
 # DATA PATH PARAMETERS
 ## PLACE THE ASSIGNMENT (INPUT) DATA FILES HERE
@@ -38,7 +40,8 @@ if __name__ == "__main__":
     PERFORM_INITIAL_MODEL_CREATION = False
     PERFORM_GRIDSEARCHCV = False
     PERFORM_BEST_GRIDSEARCH_MODEL_CREATION = True
-    PERFORM_SHAP_COMPUTE = True
+    PERFORM_SHAP_COMPUTE = False
+    PERFORM_FINAL_CLASSIFICATION = True
     
     RANDOM_SEED = 1 #int(time.time())
     #################
@@ -174,7 +177,24 @@ if __name__ == "__main__":
         print("Calculating SHAP values")
         timeBefore = time.time()
         explainer = shap.TreeExplainer(chosen_model.model)
-        shap_values = explainer.shap_values(chosen_model._X_test)
+        shap_values = explainer(chosen_model._X_test)
         timeAfter = time.time()
         print(f"[[SHAP COMPUTE TIME: {timeAfter-timeBefore} seconds]")
+
+        shap_highincome = shap_values[:, :, 0]
+        plt.clf()
+        shap.plots.beeswarm(
+            shap_highincome,
+            show=False
+        )
+        plt.tight_layout()
+        plt.savefig((filePath / "../processed_data/shap_beeswarm").resolve())
+        plt.clf()
         
+        waterfall_index = 0
+        shap.plots.waterfall(shap_highincome[waterfall_index], show=False)
+        plt.tight_layout()
+        plt.savefig((filePath / f"../processed_data/shap_waterfall_{waterfall_index}").resolve())
+
+    if PERFORM_FINAL_CLASSIFICATION:
+        chosen_model.predict()

@@ -39,6 +39,17 @@ class Classifier(ABC):
         self._precision = None
         self._recall = None
     
+    def predict(self):
+        # Fill out the predictions template
+        templateFilePath = (filePath / "../data/predictions_template.csv").resolve()
+        outputFilePath = (filePath / "../processed_data/predictions.csv").resolve()
+        templates = pd.read_csv(templateFilePath)
+        
+        predictions = pd.Series(self._model.predict(self._preprocessor.test_predictions_data))
+        templates[self._preprocessor._label_column] = predictions
+        
+        templates.to_csv(outputFilePath, index=False)
+    
     def cross_validate(self, param_grid, score_metric="accuracy"):
         print(f"[CLASSIFIER] running cross validation on parameter grid (GridSearchCV), optimizing for {score_metric} score")
         gscv = GridSearchCV(self._model, param_grid=param_grid, scoring=score_metric, n_jobs=-1)
