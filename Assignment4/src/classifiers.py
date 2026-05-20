@@ -45,10 +45,17 @@ class Classifier(ABC):
         outputFilePath = (filePath / "../processed_data/predictions.csv").resolve()
         templates = pd.read_csv(templateFilePath)
         
-        predictions = pd.Series(self._model.predict(self._preprocessor.test_predictions_data))
+        predictions = pd.Series(
+            self._preprocessor._label_encoder.inverse_transform(
+                self._model.predict(self._preprocessor.test_predictions_data)
+            )
+        )
         templates[self._preprocessor._label_column] = predictions
         
         templates.to_csv(outputFilePath, index=False)
+        
+    def predict_single(self, data):
+        return self._model.predict(data)
     
     def cross_validate(self, param_grid, score_metric="accuracy"):
         print(f"[CLASSIFIER] running cross validation on parameter grid (GridSearchCV), optimizing for {score_metric} score")

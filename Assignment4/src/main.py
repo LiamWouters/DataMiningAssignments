@@ -25,22 +25,24 @@ PROCESSED_DATA_PATH = "./processed_data/"
 
 if __name__ == "__main__": 
     # PREPROCESSING FLAGS   
-    DROP_ABILITY_TO_SPEAK_ENGLISH = False    # if not dropped its empty rows will be filled and the column will be normalized
-    DROP_GAVE_BIRTH_THIS_YEAR = False        # ^^ and the column will be one hot encoded instead of normalized
+    DROP_ABILITY_TO_SPEAK_ENGLISH = True    # if not dropped its empty rows will be filled and the column will be normalized
+    DROP_GAVE_BIRTH_THIS_YEAR = True        # ^^ and the column will be one hot encoded instead of normalized
     FILL_CONDITION_GAVE_BIRTH_THIS_YEAR = True # Ignored if the column is dropped with DROP_GAVE_BIRTH_THIS_YEAR
 
     NORMALIZE_COLUMNS = ["age", "education", "workinghours"]  # Columns of which the values must be normalized from: [min_value, max_value] -> [0, 1]
     OHE_COLUMNS = ["workclass", "marital status", "occupation", "sex"] # Define columns to one hot encode
     LABEL_COLUMN = "income"
+    
+    # CHOSEN MODEL (Random Forest)
     CHOSEN_MODEL_PARAMETERS = { # Parameters for the model chosen for Task 2 & 3 (Random Forest)
         "max_depth": 20, "min_samples_leaf": 5, "min_samples_split": 20, "n_estimators": 250
     }
     
     # GENERAL EXECUTION FLAGS
-    PERFORM_INITIAL_MODEL_CREATION = False
-    PERFORM_GRIDSEARCHCV = False
+    PERFORM_INITIAL_MODEL_CREATION = True
+    PERFORM_GRIDSEARCHCV = True
     PERFORM_BEST_GRIDSEARCH_MODEL_CREATION = True
-    PERFORM_SHAP_COMPUTE = False
+    PERFORM_SHAP_COMPUTE = True
     PERFORM_FINAL_CLASSIFICATION = True
     
     RANDOM_SEED = 1 #int(time.time())
@@ -189,12 +191,21 @@ if __name__ == "__main__":
         )
         plt.tight_layout()
         plt.savefig((filePath / "../processed_data/shap_beeswarm").resolve())
-        plt.clf()
+        data = pd.read_csv(INCOME_PATH)
+        for waterfall_index in range(10):
+            person_test_data = chosen_model._X_test.iloc[waterfall_index]
+            person_test_data_df = chosen_model._X_test.iloc[[waterfall_index]]
+            person_index = person_test_data.name
+            person_full_row = data.iloc[person_index]
+            prediction = pp._label_encoder.inverse_transform(chosen_model.predict_single(person_test_data_df))[0]
         
-        waterfall_index = 0
-        shap.plots.waterfall(shap_highincome[waterfall_index], show=False)
-        plt.tight_layout()
-        plt.savefig((filePath / f"../processed_data/shap_waterfall_{waterfall_index}").resolve())
+            chosen_model.predict()
+
+            plt.clf()
+            shap.plots.waterfall(shap_highincome[waterfall_index], show=False)
+            plt.suptitle(f"[SHAP] person: {person_index}\nreal income: {person_full_row['income']}, predicted income: {prediction}")
+            plt.tight_layout()
+            plt.savefig((filePath / f"../processed_data/shap_waterfall_{waterfall_index}").resolve())
 
     if PERFORM_FINAL_CLASSIFICATION:
         chosen_model.predict()
